@@ -14,7 +14,6 @@ pub mod datasets_v1 {
 
 pub mod datasets_cn {
     pub const GET_KNOWLEDGE_BASE: &str = "/open_api/knowledge/dataset"; // still used by get_dataset_cn for detail fetch
-    pub const CREATE_KNOWLEDGE_BASE: &str = "/open_api/knowledge/datasets"; // used by create_knowledge_base_with_permission
 }
 
 pub mod bots {

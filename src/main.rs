@@ -16,18 +16,15 @@ use serde_json::Value;
 use std::env;
 use std::sync::Arc;
 use tracing::info;
-use tracing_subscriber;
 
 use crate::api::endpoints::COZE_BASE_URL;
 use crate::api::CozeApiClient;
-use crate::tools::config_tool::ConfigTool;
 use crate::tools::coze_tools::CozeTools;
 
 #[derive(Clone)]
 pub struct CozeServer {
     _coze_client: Arc<CozeApiClient>,
     tools: Arc<CozeTools>,
-    config_tool: Arc<ConfigTool>,
     _default_space_id: String,
 }
 
@@ -43,13 +40,10 @@ impl CozeServer {
             coze_client.clone(),
             default_space_id.clone(),
         ));
-        // 将客户端注入到配置工具中，以便运行时更新 API Key 能影响后续请求
-        let config_tool = Arc::new(ConfigTool::new().with_client(coze_client.clone()));
 
         Ok(Self {
             _coze_client: coze_client,
             tools,
-            config_tool,
             _default_space_id: default_space_id,
         })
     }

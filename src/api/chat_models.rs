@@ -147,17 +147,6 @@ impl ChatMessage {
             meta_data: None,
         }
     }
-    
-    /// 创建包含文件/图片的消息
-    pub fn object_string(role: MessageRole, object_string: String) -> Self {
-        Self {
-            role,
-            content: None,
-            content_type: None,
-            object_string: Some(object_string),
-            meta_data: None,
-        }
-    }
 }
 
 impl ChatRequest {

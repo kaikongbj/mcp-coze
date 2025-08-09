@@ -2,7 +2,7 @@
 use coze_mcp_server::api::chat_models::*;
 use coze_mcp_server::tools::coze_tools::CozeTools;
 use coze_mcp_server::api::CozeApiClient;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::sync::Arc;
 
 #[tokio::test]

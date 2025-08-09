@@ -308,6 +308,7 @@ impl CozeTools {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn list_workspaces(&self, _args: Option<Value>) -> Result<CallToolResult, McpError> {
         let endpoint = "/v1/workspaces".to_string();
         let req = CozeApiRequest {

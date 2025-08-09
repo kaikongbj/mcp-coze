@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ConfigTool {
     api_key: Arc<RwLock<Option<String>>>,
@@ -20,6 +21,7 @@ impl Default for ConfigTool {
     }
 }
 
+#[allow(dead_code)]
 impl ConfigTool {
     pub fn new() -> Self {
         Self {

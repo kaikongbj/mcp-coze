@@ -3,9 +3,7 @@ use crate::api::endpoints::{
 };
 use crate::api::error::{ApiError, ApiErrorData};
 // Chat completion models removed (unused)
-use crate::models::{CozeApiRequest, CozeApiResponse, HttpMethod};
 use reqwest::{Client, Response};
-use serde_json::json;
 use std::time::Duration;
 use urlencoding::encode;
 
@@ -67,28 +65,91 @@ impl CozeApiClient {
         serde_json::from_str(&body).map_err(ApiError::from)
     }
 
+    /// Execute a generic API request
+    pub async fn execute_request(
+        &self,
+        req: crate::models::CozeApiRequest,
+    ) -> Result<crate::models::CozeApiResponse, ApiError> {
+        use crate::models::HttpMethod;
+        
+        let method_str = match req.method {
+            HttpMethod::Get => "GET",
+            HttpMethod::Post => "POST",
+            HttpMethod::Put => "PUT",
+            HttpMethod::Delete => "DELETE",
+            HttpMethod::Patch => "PATCH",
+        };
+
+        let mut url = format!("{}{}", self.base_url, req.endpoint);
+        
+        // Add query parameters for GET requests
+        if !req.params.is_empty() && matches!(req.method, HttpMethod::Get) {
+            let params: Vec<String> = req.params
+                .iter()
+                .map(|(k, v)| {
+                    let value_str = match v {
+                        serde_json::Value::String(s) => s.clone(),
+                        _ => v.to_string().trim_matches('"').to_string(),
+                    };
+                    format!("{}={}", urlencoding::encode(k), urlencoding::encode(&value_str))
+                })
+                .collect();
+            if !params.is_empty() {
+                url.push('?');
+                url.push_str(&params.join("&"));
+            }
+        }
+
+        let response = self.send_raw_request(method_str, &url, req.body).await?;
+        let status_code = response.status().as_u16();
+        let headers = response.headers()
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect();
+        
+        let body_text = response.text().await?;
+        let body: serde_json::Value = serde_json::from_str(&body_text)
+            .unwrap_or_else(|_| serde_json::Value::String(body_text));
+
+        Ok(crate::models::CozeApiResponse {
+            status_code,
+            headers,
+            body,
+            success: status_code >= 200 && status_code < 300,
+        })
+    }
+
+    /// Create knowledge base with permission (legacy compatibility method)
+    /// This method wraps the standard create_dataset API with additional parameters
+    pub async fn create_knowledge_base_with_permission(
+        &self,
+        name: String,
+        description: Option<String>,
+        space_id: Option<String>,
+        _permission: Option<i32>, // Note: permission parameter not used in current API
+    ) -> Result<serde_json::Value, ApiError> {
+        use crate::api::knowledge_models::CreateDatasetRequest;
+        
+        // Default space_id if not provided (this should be configured properly)
+        let space_id = space_id.unwrap_or_else(|| "default_space".to_string());
+        
+        let request = CreateDatasetRequest {
+            name,
+            space_id,
+            format_type: 0, // Default to text type
+            description,
+            file_id: None,
+        };
+        
+        let response = self.create_dataset(request).await?;
+        
+        // Convert to generic JSON value for compatibility
+        Ok(serde_json::to_value(response).map_err(ApiError::from)?)
+    }
+
     // Removed deprecated create_knowledge_base* variants (single public path retained at tool layer if needed)
 
     // Removed deprecated upload_document_to_knowledge_base* variants
-    pub async fn upload_document(
-        &self,
-        dataset_id: &str,
-        documents: Vec<crate::api::knowledge_models::DocumentBase>,
-        chunk_strategy: Option<crate::api::knowledge_models::ChunkStrategy>,
-    ) -> Result<crate::api::knowledge_models::KnowledgeDocumentCreateResponse, ApiError> {
-    use crate::api::knowledge_models::KnowledgeDocumentCreateRequest;
-        let url = format!("{}/{}", self.base_url, KNOWLEDGE_DOCUMENT_CREATE_URL);
-        let req = KnowledgeDocumentCreateRequest {
-            dataset_id: dataset_id.to_string(),
-            document_bases: documents,
-            chunk_strategy,
-            format_type: None,
-        };
-        let payload = req.into_json()?;
-        let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
-        self.process_response(resp).await
-    }
-
     /// CN Spec aligned upload (document_bases -> name + source_info)
     pub async fn upload_document_cn(
         &self,
@@ -104,65 +165,6 @@ impl CozeApiClient {
     }
 
     // chat_completion methods removed (tool layer does not expose)
-
-    // ---- Public high-level generic request used by CozeTools ----
-    pub async fn execute_request(&self, req: CozeApiRequest) -> Result<CozeApiResponse, ApiError> {
-        let method_str = match req.method {
-            HttpMethod::Get => "GET",
-            HttpMethod::Post => "POST",
-            HttpMethod::Put => "PUT",
-            HttpMethod::Delete => "DELETE",
-            HttpMethod::Patch => "PATCH",
-        };
-        let mut url = format!("{}{}", self.base_url, req.endpoint);
-        if !req.params.is_empty() {
-            let mut pairs: Vec<String> = Vec::new();
-            for (k, v) in &req.params {
-                if let Some(s) = v.as_str() {
-                    pairs.push(format!("{}={}", encode(k), encode(s)));
-                } else if v.is_number() || v.is_boolean() {
-                    pairs.push(format!("{}={}", encode(k), encode(&v.to_string())));
-                }
-            }
-            if !pairs.is_empty() {
-                if url.contains('?') {
-                    url.push('&');
-                } else {
-                    url.push('?');
-                }
-                url.push_str(&pairs.join("&"));
-            }
-        }
-
-        let mut request_builder = self
-            .client
-            .request(method_str.parse().unwrap(), &url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json");
-
-        for (k, v) in &req.headers {
-            request_builder = request_builder.header(k, v);
-        }
-        if let Some(body) = &req.body {
-            request_builder = request_builder.json(body);
-        }
-
-        let resp = request_builder.send().await?;
-        let status_code = resp.status().as_u16();
-        let headers = resp
-            .headers()
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
-            .collect::<std::collections::HashMap<String, String>>();
-        let text = resp.text().await?;
-        let body_json: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|_| json!({"raw": text}));
-        Ok(CozeApiResponse {
-            status_code,
-            headers,
-            success: status_code < 400,
-            body: body_json,
-        })
-    }
 
     // ---- Additional API helpers required by tools ----
     pub async fn get_dataset_cn(&self, dataset_id: &str) -> Result<serde_json::Value, ApiError> {
@@ -204,26 +206,6 @@ impl CozeApiClient {
         let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
         self.process_response(resp).await
     }
-
-    pub async fn create_knowledge_base_with_permission(
-        &self,
-        name: String,
-        description: Option<String>,
-        space_id: Option<String>,
-        permission: Option<i32>,
-    ) -> Result<serde_json::Value, ApiError> {
-        use crate::api::endpoints::datasets_cn::CREATE_KNOWLEDGE_BASE;
-        let url = format!("{}{}", self.base_url, CREATE_KNOWLEDGE_BASE);
-        let payload = json!({
-            "name": name,
-            "description": description.unwrap_or_default(),
-            "space_id": space_id,
-            "permission": permission,
-        });
-        let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
-        self.process_response(resp).await
-    }
-
 
     /// Official /v1/datasets list API (as per public documentation)
     pub async fn list_datasets(
