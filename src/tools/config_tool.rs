@@ -14,6 +14,12 @@ pub struct ConfigTool {
     coze_client: Option<Arc<CozeApiClient>>,
 }
 
+impl Default for ConfigTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConfigTool {
     pub fn new() -> Self {
         Self {

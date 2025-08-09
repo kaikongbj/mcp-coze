@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 /// Bot 发布状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BotPublishStatus {
     /// 全部状态
     All,
     /// 已发布正式版
+    #[default]
     PublishedOnline,
     /// 已发布草稿
     PublishedDraft,
@@ -138,11 +139,5 @@ impl ListBotsRequest {
         }
         
         params.join("&")
-    }
-}
-
-impl Default for BotPublishStatus {
-    fn default() -> Self {
-        BotPublishStatus::PublishedOnline
     }
 }

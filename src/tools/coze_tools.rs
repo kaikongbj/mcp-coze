@@ -600,7 +600,7 @@ impl CozeTools {
             Ok(metadata) => metadata,
             Err(e) => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(&format!(
+                    content: Some(vec![rmcp::model::Content::text(format!(
                         "Failed to read file metadata: {}", e
                     ))]),
                     is_error: Some(true),
@@ -838,9 +838,8 @@ impl CozeTools {
         
         match self.coze_client.chat(chat_request).await {
             Ok(response) => {
-                let was_user_id_generated = !args.get("user_id")
-                    .and_then(|v| v.as_str())
-                    .is_some();
+                let was_user_id_generated = args.get("user_id")
+                    .and_then(|v| v.as_str()).is_none();
                 
                 let user_id_info = if was_user_id_generated {
                     format!("user_id: {} (自动生成)\n", user_id)

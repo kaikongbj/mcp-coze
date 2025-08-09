@@ -126,7 +126,7 @@ impl CozeApiClient {
             }
             if !pairs.is_empty() {
                 if url.contains('?') {
-                    url.push_str("&");
+                    url.push('&');
                 } else {
                     url.push('?');
                 }
