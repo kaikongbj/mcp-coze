@@ -369,15 +369,43 @@ impl CozeTools {
         &self,
         args: Option<Value>,
     ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
+        let args = match args {
+            Some(args) => args,
+            None => {
+                return Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text("Missing arguments")]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({
+                        "success": false,
+                        "error": "Missing arguments"
+                    })),
+                });
+            }
+        };
         
-        let name = args
-            .get("name")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| McpError::invalid_params("Missing name parameter", None))?;
+        let name = match args.get("name").and_then(|v| v.as_str()) {
+            Some(name) => name,
+            None => {
+                return Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text("Missing name parameter")]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({
+                        "success": false,
+                        "error": "Missing name parameter"
+                    })),
+                });
+            }
+        };
             
         if name.len() > 100 {
-            return Err(McpError::invalid_params("Name length cannot exceed 100 characters", None));
+            return Ok(CallToolResult {
+                content: Some(vec![rmcp::model::Content::text("Name length cannot exceed 100 characters")]),
+                is_error: Some(true),
+                structured_content: Some(json!({
+                    "success": false,
+                    "error": "Name length cannot exceed 100 characters"
+                })),
+            });
         }
         
         let space_id = args
@@ -389,17 +417,45 @@ impl CozeTools {
                 } else {
                     None
                 }
-            })
-            .ok_or_else(|| McpError::invalid_params("Missing space_id parameter", None))?;
+            });
             
-        let format_type = args
-            .get("format_type")
-            .and_then(|v| v.as_i64())
-            .map(|n| n as i32)
-            .ok_or_else(|| McpError::invalid_params("Missing format_type parameter (0 for text, 2 for image)", None))?;
+        let space_id = match space_id {
+            Some(space_id) => space_id,
+            None => {
+                return Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text("Missing space_id parameter")]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({
+                        "success": false,
+                        "error": "Missing space_id parameter"
+                    })),
+                });
+            }
+        };
+            
+        let format_type = match args.get("format_type").and_then(|v| v.as_i64()).map(|n| n as i32) {
+            Some(format_type) => format_type,
+            None => {
+                return Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text("Missing format_type parameter (0 for text, 2 for image)")]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({
+                        "success": false,
+                        "error": "Missing format_type parameter (0 for text, 2 for image)"
+                    })),
+                });
+            }
+        };
             
         if format_type != 0 && format_type != 2 {
-            return Err(McpError::invalid_params("Invalid format_type, must be 0 (text) or 2 (image)", None));
+            return Ok(CallToolResult {
+                content: Some(vec![rmcp::model::Content::text("Invalid format_type, must be 0 (text) or 2 (image)")]),
+                is_error: Some(true),
+                structured_content: Some(json!({
+                    "success": false,
+                    "error": "Invalid format_type, must be 0 (text) or 2 (image)"
+                })),
+            });
         }
         
         let description = args
@@ -540,9 +596,21 @@ impl CozeTools {
             .map(|v| v as usize)
             .unwrap_or(800);
 
-        let metadata = fs::metadata(file_path).await.map_err(|e| {
-            McpError::invalid_params(format!("Failed to read file metadata: {}", e), None)
-        })?;
+        let metadata = match fs::metadata(file_path).await {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                return Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(&format!(
+                        "Failed to read file metadata: {}", e
+                    ))]),
+                    is_error: Some(true),
+                    structured_content: Some(serde_json::json!({
+                        "error": "file_not_found",
+                        "message": format!("Failed to read file metadata: {}", e)
+                    })),
+                });
+            }
+        };
         let file_size = metadata.len();
         if file_size == 0 {
             return Err(McpError::invalid_params("File is empty", None));
