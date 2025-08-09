@@ -5,12 +5,11 @@ pub const COZE_BASE_URL: &str = "https://api.coze.cn";
 
 pub mod conversation {
     pub const LIST_CONVERSATIONS: &str = "/v1/conversations"; // used by list_conversations_v1
-    pub const GET_CONVERSATION: &str = "/v1/conversation/retrieve"; // used by retrieve_conversation_v1
-    pub const GET_MESSAGES: &str = "/v3/chat/conversations/{conversation_id}/messages"; // used by get_conversation_messages_v3
 }
 
 pub mod datasets_v1 {
     pub const LIST_DATASETS: &str = "/v1/datasets"; // canonical dataset listing
+    pub const CREATE_DATASETS: &str = "/v1/datasets"; // 创建知识库 API
 }
 
 pub mod datasets_cn {
@@ -18,37 +17,18 @@ pub mod datasets_cn {
     pub const CREATE_KNOWLEDGE_BASE: &str = "/open_api/knowledge/datasets"; // used by create_knowledge_base_with_permission
 }
 
-pub const CHAT_COMPLETION_URL: &str = "/v3/chat"; // used by chat_completion
-pub const CHAT_COMPLETION_CN: &str = "/v3/chat"; // used by chat_completion_cn
+pub mod bots {
+    pub const LIST_BOTS: &str = "/v1/bots"; // used by list_bots
+}
+
+pub mod chat {
+    pub const CHAT_V3: &str = "/v3/chat";
+    pub const CHAT_V3_STREAM: &str = "/v3/chat";
+    pub const GET_CHAT_DETAIL: &str = "/v3/chat/retrieve"; // 获取对话详情
+    pub const GET_CHAT_MESSAGES: &str = "/v3/chat/message/list"; // 获取对话消息列表
+}
+
+// Chat completion endpoints removed (unused)
 pub const KNOWLEDGE_DOCUMENT_CREATE_URL: &str = "/open_api/knowledge/document/create"; // (legacy upload removed; retain if tool layer still references)
 
-/// Common request/response structures
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CreateKnowledgeRequest {
-    pub name: String,
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub space_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub permission: Option<i32>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct UploadDocumentRequest {
-    pub dataset_id: String,
-    pub document_bases: Vec<crate::api::knowledge_models::DocumentBase>,
-    pub chunk_strategy: Option<crate::api::knowledge_models::ChunkStrategy>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct KnowledgeBase {
-    pub id: String,
-    pub name: String,
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub space_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub permission: Option<i32>,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
+// Removed unused request/response structs

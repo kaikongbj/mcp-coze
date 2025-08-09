@@ -1,43 +1,21 @@
 use crate::api::CozeApiClient;
-use crate::knowledge::KnowledgeManager;
-// Removed obsolete imports: chat/knowledge modules not present in models.
+use crate::models::{CozeApiRequest, HttpMethod};
 use rmcp::model::CallToolResult;
 use rmcp::ErrorData as McpError;
 use serde_json::{json, Value};
-// Import request/response model types
-use crate::models::{CozeApiRequest, HttpMethod};
 use std::sync::Arc;
+use uuid;
 
 #[derive(Debug, Clone)]
 pub struct CozeTools {
     coze_client: Arc<CozeApiClient>,
-    knowledge_manager: Arc<KnowledgeManager>,
     default_space_id: String,
 }
 
 impl CozeTools {
-    fn html_escape(input: &str) -> String {
-        let mut out = String::with_capacity(input.len());
-        for ch in input.chars() {
-            match ch {
-                '&' => out.push_str("&amp;"),
-                '<' => out.push_str("&lt;"),
-                '>' => out.push_str("&gt;"),
-                '"' => out.push_str("&quot;"),
-                '\'' => out.push_str("&#39;"),
-                _ => out.push(ch),
-            }
-        }
-        out
-    }
-    pub fn new(
-        coze_client: Arc<CozeApiClient>,
-        knowledge_manager: Arc<KnowledgeManager>,
-        default_space_id: String,
-    ) -> Self {
+    pub fn new(coze_client: Arc<CozeApiClient>, default_space_id: String) -> Self {
         Self {
             coze_client,
-            knowledge_manager,
             default_space_id,
         }
     }
@@ -109,8 +87,12 @@ impl CozeTools {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-    // 使用统一 /v1/datasets 接口
-    match self.coze_client.list_datasets(&space_id, name.as_deref(), format_type, page_num, page_size).await {
+        // 使用统一 /v1/datasets 接口
+        match self
+            .coze_client
+            .list_datasets(&space_id, name.as_deref(), format_type, page_num, page_size)
+            .await
+        {
             Ok(mut result) => {
                 // Optional: refine document_count by fetching dataset detail (limited to first 50 to avoid many requests)
                 if accurate_counts {
@@ -150,50 +132,58 @@ impl CozeTools {
                     response
                 };
                 let sc_items: Vec<Value> = if detailed {
-                    result.datasets.iter().map(|kb| {
-                        serde_json::json!({
-                            "dataset_id": kb.dataset_id,
-                            "name": kb.name,
-                            "description": kb.description,
-                            "document_count": kb.document_count,
-                            "created_at": kb.created_at,
-                            "update_time": kb.update_time,
-                            "status": kb.status,
-                            "format_type": kb.format_type,
-                            "slice_count": kb.slice_count,
-                            "space_id": kb.space_id,
-                            "dataset_type": kb.dataset_type,
-                            "can_edit": kb.can_edit,
-                            "icon_url": kb.icon_url,
-                            "icon_uri": kb.icon_uri,
-                            "avatar_url": kb.avatar_url,
-                            "creator_id": kb.creator_id,
-                            "creator_name": kb.creator_name,
-                            "hit_count": kb.hit_count,
-                            "all_file_size": kb.all_file_size,
-                            "bot_used_count": kb.bot_used_count,
-                            "file_list": kb.file_list,
-                            "failed_file_list": kb.failed_file_list,
-                            "processing_file_list": kb.processing_file_list,
-                            "processing_file_id_list": kb.processing_file_id_list,
-                            "chunk_strategy": kb.chunk_strategy,
-                            "storage_config": kb.storage_config,
-                            "project_id": kb.project_id,
-                            "raw_extra": kb.raw_extra,
+                    result
+                        .datasets
+                        .iter()
+                        .map(|kb| {
+                            json!({
+                                "dataset_id": kb.dataset_id,
+                                "name": kb.name,
+                                "description": kb.description,
+                                "document_count": kb.document_count,
+                                "created_at": kb.created_at,
+                                "update_time": kb.update_time,
+                                "status": kb.status,
+                                "format_type": kb.format_type,
+                                "slice_count": kb.slice_count,
+                                "space_id": kb.space_id,
+                                "dataset_type": kb.dataset_type,
+                                "can_edit": kb.can_edit,
+                                "icon_url": kb.icon_url,
+                                "icon_uri": kb.icon_uri,
+                                "avatar_url": kb.avatar_url,
+                                "creator_id": kb.creator_id,
+                                "creator_name": kb.creator_name,
+                                "hit_count": kb.hit_count,
+                                "all_file_size": kb.all_file_size,
+                                "bot_used_count": kb.bot_used_count,
+                                "file_list": kb.file_list,
+                                "failed_file_list": kb.failed_file_list,
+                                "processing_file_list": kb.processing_file_list,
+                                "processing_file_id_list": kb.processing_file_id_list,
+                                "chunk_strategy": kb.chunk_strategy,
+                                "storage_config": kb.storage_config,
+                                "project_id": kb.project_id,
+                                "raw_extra": kb.raw_extra,
+                            })
                         })
-                    }).collect()
+                        .collect()
                 } else {
-                    result.datasets.iter().map(|kb| {
-                        serde_json::json!({
-                            "dataset_id": kb.dataset_id,
-                            "name": kb.name,
-                            "description": kb.description,
-                            "document_count": kb.document_count,
-                            "created_at": kb.created_at,
+                    result
+                        .datasets
+                        .iter()
+                        .map(|kb| {
+                            json!({
+                                "dataset_id": kb.dataset_id,
+                                "name": kb.name,
+                                "description": kb.description,
+                                "document_count": kb.document_count,
+                                "created_at": kb.created_at,
+                            })
                         })
-                    }).collect()
+                        .collect()
                 };
-                let structured = serde_json::json!({ "total": result.total, "detailed": detailed, "items": sc_items });
+                let structured = json!({ "total": result.total, "detailed": detailed, "items": sc_items });
 
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(content)]),
@@ -201,19 +191,24 @@ impl CozeTools {
                     structured_content: Some(structured),
                 })
             }
-            Err(e) => Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text(format!(
-                    "获取知识库列表失败: {}",
-                    e
-                ))]),
-                is_error: Some(true),
-                structured_content: None,
-            }),
+            Err(e) => {
+                let serialized =
+                    serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(format!(
+                        "获取知识库列表失败: {}",
+                        e
+                    ))]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": serialized})),
+                })
+            }
         }
     }
 
     pub async fn list_bots(&self, args: Option<Value>) -> Result<CallToolResult, McpError> {
         let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
+        
         // Accept either workspace_id or space_id
         let workspace_id = args
             .get("workspace_id")
@@ -229,65 +224,89 @@ impl CozeTools {
             .ok_or_else(|| {
                 McpError::invalid_params("Missing workspace_id (or space_id) parameter", None)
             })?;
-        let page = args.get("page").and_then(|v| v.as_u64()).unwrap_or(1);
-        let page_size = args.get("page_size").and_then(|v| v.as_u64()).unwrap_or(20);
 
-        let endpoint = format!(
-            "/v1/bots?workspace_id={}&page={}&page_size={}&status=draft_published",
-            urlencoding::encode(workspace_id),
-            page,
-            page_size
-        );
-        let req = CozeApiRequest {
-            endpoint,
-            method: HttpMethod::Get,
-            headers: Default::default(),
-            params: Default::default(),
-            body: None,
-        };
-    match self.coze_client.execute_request(req).await {
-            Ok(resp) => {
-                let data = resp.body.get("data").cloned().unwrap_or(resp.body);
-                let (items, total) = Self::extract_list_and_total(&data);
+        // 解析可选参数
+        let page_num = args.get("page").and_then(|v| v.as_u64()).map(|p| p as u32).unwrap_or(1);
+        let page_size = args.get("page_size").and_then(|v| v.as_u64()).map(|p| p as u32).unwrap_or(20);
+        
+        // 解析发布状态
+        let publish_status = args
+            .get("publish_status")
+            .and_then(|v| v.as_str())
+            .map(|s| match s {
+                "all" => crate::api::bot_models::BotPublishStatus::All,
+                "published_online" => crate::api::bot_models::BotPublishStatus::PublishedOnline,
+                "published_draft" => crate::api::bot_models::BotPublishStatus::PublishedDraft,
+                "unpublished_draft" => crate::api::bot_models::BotPublishStatus::UnpublishedDraft,
+                _ => crate::api::bot_models::BotPublishStatus::PublishedOnline,
+            })
+            .unwrap_or(crate::api::bot_models::BotPublishStatus::PublishedOnline);
+
+        let connector_id = args
+            .get("connector_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "1024".to_string());
+
+        // 构建请求
+        let request = crate::api::bot_models::ListBotsRequest::new(workspace_id.to_string())
+            .with_publish_status(publish_status)
+            .with_connector_id(connector_id)
+            .with_page(page_num, page_size);
+
+        match self.coze_client.list_bots_typed(&request).await {
+            Ok(response) => {
+                let total = response.data.total;
                 let mut out = format!("找到 {} 个 Bot:\n\n", total);
                 let mut sc_items: Vec<Value> = Vec::new();
-                for (i, it) in items.iter().take(5).enumerate() {
-                    if let Some(obj) = it.as_object() {
-                        let id = Self::get_str(obj, "bot_id");
-                        let name = Self::get_str(obj, "name");
-                        let status = Self::get_str(obj, "status");
-                        out.push_str(&format!(
-                            "{}. {} (id: {}, status: {})\n",
-                            i + 1,
-                            name,
-                            id,
-                            status
-                        ));
-                        sc_items.push(serde_json::json!({
-                            "bot_id": id,
-                            "name": name,
-                            "status": status,
-                        }));
-                    }
+                
+                for (i, bot) in response.data.items.iter().take(5).enumerate() {
+                    let status = if bot.is_published.unwrap_or(false) { "published" } else { "draft" };
+                    out.push_str(&format!(
+                        "{}. {} (id: {}, status: {})\n",
+                        i + 1,
+                        bot.name,
+                        bot.id,
+                        status
+                    ));
+                    sc_items.push(json!({
+                        "bot_id": bot.id,
+                        "name": bot.name,
+                        "status": status,
+                        "description": bot.description,
+                        "icon_url": bot.icon_url,
+                        "updated_at": bot.updated_at,
+                        "owner_user_id": bot.owner_user_id,
+                    }));
                 }
-                let structured = serde_json::json!({ "total": total, "items": sc_items });
+                
+                let structured = json!({ 
+                    "total": total, 
+                    "items": sc_items,
+                    "page_num": page_num,
+                    "page_size": page_size,
+                });
+                
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(out)]),
                     is_error: Some(false),
                     structured_content: Some(structured),
                 })
             }
-            Err(e) => Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text(format!(
-                    "[Bots] 请求失败: {}",
-                    e
-                ))]),
-                is_error: Some(true),
-                structured_content: None,
-            }),
+            Err(e) => {
+                let serialized =
+                    serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(format!(
+                        "[Bots] 请求失败: {}",
+                        e
+                    ))]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": serialized})),
+                })
+            }
         }
     }
-
 
     pub async fn list_workspaces(&self, _args: Option<Value>) -> Result<CallToolResult, McpError> {
         let endpoint = "/v1/workspaces".to_string();
@@ -298,7 +317,7 @@ impl CozeTools {
             params: Default::default(),
             body: None,
         };
-    match self.coze_client.execute_request(req).await {
+        match self.coze_client.execute_request(req).await {
             Ok(resp) => {
                 let data = resp.body.get("data").cloned().unwrap_or(resp.body);
                 let (items, total) = Self::extract_list_and_total(&data);
@@ -306,298 +325,744 @@ impl CozeTools {
                 let mut sc_items: Vec<Value> = Vec::new();
                 for (i, it) in items.iter().take(5).enumerate() {
                     if let Some(obj) = it.as_object() {
-                        // (Removed many conversation export/analysis helpers for minimal surface.)
-        let mut items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        if direction.eq_ignore_ascii_case("desc") { items.reverse(); }
-        let items: Vec<Value> = if let Some(l) = limit { items.into_iter().take(l).collect() } else { items };
-        let mut text = String::new();
-        for it in items.iter() {
-            if let Some(o) = it.as_object() {
-                let role = o.get("role").and_then(|v| v.as_str()).unwrap_or("");
-                let content = o.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                text.push_str(&format!("[{}] {}\n", role, content));
-            }
-        }
-        Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("导出会话 {} 的纯文本成功（方向: {}，行数: {}）", conversation_id, direction, text.lines().count()))]), is_error: Some(false), structured_content: Some(serde_json::json!({"conversation_id": conversation_id, "direction": direction, "text": text})) })
-    }
-
-    // 获取某条消息的上下文窗口（前后若干条）
-    pub async fn get_message_context(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let message_id = args.get("message_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing message_id parameter", None))?;
-        let before = args.get("before").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
-        let after = args.get("after").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Message Context] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        let pos = items.iter().position(|it| it.get("message_id").and_then(|v| v.as_str()) == Some(message_id));
-        if let Some(idx) = pos {
-            let start = idx.saturating_sub(before);
-            let end = (idx + 1 + after).min(items.len());
-            let window = &items[start..end];
-            let sc_items: Vec<Value> = window.iter().map(|v| v.clone()).collect();
-            let content = format!("消息上下文窗口：index={}，范围=[{}, {})，总计 {} 条", idx, start, end, sc_items.len());
-            Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(content)]), is_error: Some(false), structured_content: Some(serde_json::json!({"conversation_id": conversation_id, "center_message_id": message_id, "start_index": start, "end_index": end, "messages": sc_items})) })
-        } else {
-            Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text("未找到指定 message_id")]), is_error: Some(true), structured_content: None })
-        }
-    }
-
-    // 获取某条消息在会话中的索引（0=最旧，-1=最新），便于定位
-    pub async fn get_message_index_by_id(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let message_id = args.get("message_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing message_id parameter", None))?;
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Message Index] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        if items.is_empty() {
-            return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text("未找到任何消息")]), is_error: Some(true), structured_content: None });
-        }
-        let idx_opt = items.iter().position(|it| it.get("message_id").and_then(|v| v.as_str()) == Some(message_id));
-        match idx_opt {
-            Some(idx) => {
-                let last_idx = items.len() as isize - 1;
-                let neg_idx = idx as isize - (last_idx as isize);
-                let obj = items[idx].as_object().cloned().unwrap_or_default();
-                let role = obj.get("role").and_then(|v| v.as_str()).unwrap_or("");
-                let content = obj.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                let create_time = obj.get("create_time").cloned().unwrap_or(Value::Null);
-                let summary = format!("message_id={} at index={} (neg_index={}), role={}, create_time={}", message_id, idx, neg_idx, role, create_time);
-                Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(summary)]),
-                    is_error: Some(false),
-                    structured_content: Some(serde_json::json!({
-                        "conversation_id": conversation_id,
-                        "message_id": message_id,
-                        "index": idx,
-                        "neg_index": neg_idx,
-                        "role": role,
-                        "create_time": create_time,
-                        "content_preview": content.chars().take(120).collect::<String>()
-                    }))
-                })
-            }
-            None => Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text("未找到指定 message_id")]), is_error: Some(true), structured_content: None }),
-        }
-    }
-
-    // 获取会话的时间线简表（index, message_id, role, create_time），便于概览
-    pub async fn get_conversation_timeline(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let direction = args.get("direction").and_then(|v| v.as_str()).unwrap_or("asc");
-        let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Timeline] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let mut items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        if direction.eq_ignore_ascii_case("desc") { items.reverse(); }
-        let items: Vec<Value> = if let Some(l) = limit { items.into_iter().take(l).collect() } else { items };
-        let mut rows: Vec<Value> = Vec::with_capacity(items.len());
-        for (i, it) in items.iter().enumerate() {
-            if let Some(o) = it.as_object() {
-                let message_id = o.get("message_id").and_then(|v| v.as_str()).unwrap_or("");
-                let role = o.get("role").and_then(|v| v.as_str()).unwrap_or("");
-                let create_time = o.get("create_time").cloned().unwrap_or(Value::Null);
-                rows.push(serde_json::json!({
-                    "index": i,
-                    "message_id": message_id,
-                    "role": role,
-                    "create_time": create_time
-                }));
-            }
-        }
-        Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("时间线生成成功：{} 条", rows.len()))]), is_error: Some(false), structured_content: Some(serde_json::json!({
-            "conversation_id": conversation_id,
-            "direction": direction,
-            "rows": rows
-        })) })
-    }
-
-    // 导出会话为 CSV 文本（只读，本地拼接），列：index,message_id,role,create_time,content
-    pub async fn export_conversation_csv(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let direction = args.get("direction").and_then(|v| v.as_str()).unwrap_or("asc");
-        let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Export CSV] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let mut items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        if direction.eq_ignore_ascii_case("desc") { items.reverse(); }
-        let items: Vec<Value> = if let Some(l) = limit { items.into_iter().take(l).collect() } else { items };
-        let mut csv = String::from("index,message_id,role,create_time,content\n");
-        for (i, it) in items.iter().enumerate() {
-            if let Some(o) = it.as_object() {
-                let message_id = o.get("message_id").and_then(|v| v.as_str()).unwrap_or("");
-                let role = o.get("role").and_then(|v| v.as_str()).unwrap_or("");
-                let create_time = o.get("create_time").map(|v| v.to_string()).unwrap_or("".to_string());
-                let mut content = o.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                // 简易转义：替换双引号并包裹
-                content = content.replace('"', "\"");
-                let content = format!("\"{}\"", content);
-                csv.push_str(&format!("{},{}{},{}{},{}{},{}{},{}\n",
-                    i,
-                    "", message_id,
-                    "", role,
-                    "", create_time,
-                    "", content,
-                    ""));
-            }
-        }
-        Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("导出会话 {} 的 CSV 成功（方向: {}，行数: {}）", conversation_id, direction, csv.lines().count() - 1))]), is_error: Some(false), structured_content: Some(serde_json::json!({
-            "conversation_id": conversation_id,
-            "direction": direction,
-            "csv": csv
-        })) })
-    }
-
-    // 过滤指定角色的消息
-    pub async fn filter_messages_by_role(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let role = args.get("role").and_then(|v| v.as_str()).unwrap_or("");
-        let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(50);
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Filter By Role] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        let mut out: Vec<Value> = Vec::new();
-        for it in items.iter() {
-            if let Some(o) = it.as_object() {
-                let r = o.get("role").and_then(|v| v.as_str()).unwrap_or("");
-                if role.is_empty() || r.eq_ignore_ascii_case(role) {
-                    out.push(Value::Object(o.clone()));
-                    if out.len() >= limit { break; }
-                }
-            }
-        }
-        let content = format!("筛选角色 '{}' 的消息，共 {} 条（limit={}）", role, out.len(), limit);
-        Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(content)]), is_error: Some(false), structured_content: Some(serde_json::json!({
-            "conversation_id": conversation_id,
-            "role": role,
-            "limit": limit,
-            "messages": out
-        })) })
-    }
-
-    // 计算会话时长（首尾 create_time 的差值）
-    pub async fn get_conversation_duration(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Duration] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        if items.is_empty() {
-            return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text("没有消息，无法计算时长")]), is_error: Some(true), structured_content: None });
-        }
-        let first_ct = items.first().and_then(|x| x.get("create_time")).cloned();
-        let last_ct = items.last().and_then(|x| x.get("create_time")).cloned();
-        // 兼容数字或字符串时间戳（毫秒/秒），这里仅以原值返回并尝试做简单差值（若均为整数）
-        let duration_ms = match (first_ct.as_ref().and_then(|v| v.as_i64()), last_ct.as_ref().and_then(|v| v.as_i64())) {
-            (Some(f), Some(l)) => Some(l.saturating_sub(f)),
-            _ => None,
-        };
-        let content = match duration_ms {
-            Some(d) => format!("会话时长：{} (单位取决于 create_time 的粒度，通常为毫秒)", d),
-            None => "会话时长：无法计算（时间戳类型不统一或缺失）".to_string(),
-        };
-        Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(content.clone())]), is_error: Some(false), structured_content: Some(serde_json::json!({
-            "conversation_id": conversation_id,
-            "first_create_time": first_ct,
-            "last_create_time": last_ct,
-            "duration": duration_ms
-        })) })
-    }
-
-    // 导出会话为 NDJSON（每行一个 JSON 对象）
-    pub async fn export_conversation_ndjson(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let direction = args.get("direction").and_then(|v| v.as_str()).unwrap_or("asc");
-        let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Export NDJSON] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let mut items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        if direction.eq_ignore_ascii_case("desc") { items.reverse(); }
-        let items: Vec<Value> = if let Some(l) = limit { items.into_iter().take(l).collect() } else { items };
-        let mut out = String::new();
-        for it in items.iter() {
-            out.push_str(&serde_json::to_string(it).unwrap_or("{}".to_string()));
-            out.push('\n');
-        }
-        Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("导出会话 {} 的 NDJSON 成功（方向: {}，行数: {}）", conversation_id, direction, out.lines().count()))]), is_error: Some(false), structured_content: Some(serde_json::json!({
-            "conversation_id": conversation_id,
-            "direction": direction,
-            "ndjson": out
-        })) })
-    }
-
-    // 按时间范围过滤消息（闭区间），create_time 支持数值字符串
-    pub async fn filter_messages_by_time_range(
-        &self,
-        args: Option<Value>,
-    ) -> Result<CallToolResult, McpError> {
-        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
-        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).ok_or_else(|| McpError::invalid_params("Missing conversation_id parameter", None))?;
-        let start = args.get("start").and_then(|v| v.as_i64()).or_else(|| args.get("start").and_then(|v| v.as_str()).and_then(|s| s.parse::<i64>().ok())).ok_or_else(|| McpError::invalid_params("Missing or invalid start", None))?;
-        let end = args.get("end").and_then(|v| v.as_i64()).or_else(|| args.get("end").and_then(|v| v.as_str()).and_then(|s| s.parse::<i64>().ok())).ok_or_else(|| McpError::invalid_params("Missing or invalid end", None))?;
-        let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(200);
-        let body = match self.coze_client.get_conversation_messages_v3(conversation_id).await { Ok(b) => b, Err(e) => { return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("[Filter By Time] 请求失败: {}", e))]), is_error: Some(true), structured_content: None }) } };
-        let data = body.get("data").cloned().unwrap_or(body);
-        let items = data.get("messages").or_else(|| data.get("list")).or_else(|| data.get("items")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        let mut out: Vec<Value> = Vec::new();
-        for it in items.iter() {
-            if let Some(o) = it.as_object() {
-                let ct = o.get("create_time").and_then(|v| v.as_i64()).or_else(|| o.get("create_time").and_then(|v| v.as_str()).and_then(|s| s.parse::<i64>().ok()));
-                if let Some(ts) = ct {
-                    if ts >= start && ts <= end {
-                        out.push(Value::Object(o.clone()));
-                        if out.len() >= limit { break; }
+                        let ws_id = Self::get_str(obj, "workspace_id");
+                        let name = Self::get_str(obj, "name");
+                        out.push_str(&format!("{}. {} (id: {})\n", i + 1, name, ws_id));
+                        sc_items.push(json!({"workspace_id": ws_id, "name": name}));
                     }
                 }
-                let structured = serde_json::json!({
-                    "dataset_id": dataset_id,
-                    "name": name,
-                    "description": description,
-                    "space_id": space_id,
-                    "permission": permission
-                });
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(out)]),
+                    is_error: Some(false),
+                    structured_content: Some(json!({"total": total, "items": sc_items})),
+                })
+            }
+            Err(e) => {
+                let serialized =
+                    serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(format!(
+                        "[Workspaces] 请求失败: {}",
+                        e
+                    ))]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": serialized})),
+                })
+            }
+        }
+    }
 
+    // ===== 保留最小工具面 =====
+    // ===== 仅保留: list_workspaces, list_bots, list_knowledge_bases, create_dataset, upload_document_to_knowledge_base, list_conversations =====
+
+    /// 创建知识库 (使用标准 v1/datasets API，符合官方文档规范)
+    /// 
+    /// 支持创建文本或图片类型的知识库
+    /// 
+    /// 参数:
+    /// - name: 知识库名称 (必需，长度不超过100字符)
+    /// - space_id: 空间ID (必需)
+    /// - format_type: 知识库类型 (必需，0-文本，2-图片)
+    /// - description: 描述信息 (可选)
+    /// - file_id: 图标文件ID (可选)
+    pub async fn create_dataset(
+        &self,
+        args: Option<Value>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
+        
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_params("Missing name parameter", None))?;
+            
+        if name.len() > 100 {
+            return Err(McpError::invalid_params("Name length cannot exceed 100 characters", None));
+        }
+        
+        let space_id = args
+            .get("space_id")
+            .and_then(|v| v.as_str())
+            .or_else(|| {
+                if !self.default_space_id.is_empty() {
+                    Some(&self.default_space_id)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| McpError::invalid_params("Missing space_id parameter", None))?;
+            
+        let format_type = args
+            .get("format_type")
+            .and_then(|v| v.as_i64())
+            .map(|n| n as i32)
+            .ok_or_else(|| McpError::invalid_params("Missing format_type parameter (0 for text, 2 for image)", None))?;
+            
+        if format_type != 0 && format_type != 2 {
+            return Err(McpError::invalid_params("Invalid format_type, must be 0 (text) or 2 (image)", None));
+        }
+        
+        let description = args
+            .get("description")
+            .and_then(|v| v.as_str());
+            
+        let file_id = args
+            .get("file_id")
+            .and_then(|v| v.as_str());
+
+        let request = crate::api::knowledge_models::CreateDatasetRequest {
+            name: name.to_string(),
+            space_id: space_id.to_string(),
+            format_type,
+            description: description.map(|s| s.to_string()),
+            file_id: file_id.map(|s| s.to_string()),
+        };
+
+        match self.coze_client.create_dataset(request).await {
+            Ok(response) => {
+                if response.code == 0 {
+                    let dataset_id = response.data
+                        .as_ref()
+                        .map(|d| d.dataset_id.as_str())
+                        .unwrap_or("unknown");
+                    
+                    let format_type_str = match format_type {
+                        0 => "文本",
+                        2 => "图片",
+                        _ => "未知",
+                    };
+                    
+                    let content = format!(
+                        "知识库创建成功:\n- 知识库ID: {}\n- 名称: {}\n- 类型: {} ({})\n- 空间ID: {}{}{}{}",
+                        dataset_id,
+                        name,
+                        format_type_str,
+                        format_type,
+                        space_id,
+                        description.map(|d| format!("\n- 描述: {}", d)).unwrap_or_default(),
+                        file_id.map(|f| format!("\n- 图标文件ID: {}", f)).unwrap_or_default(),
+                        response.detail.as_ref().map(|d| format!("\n- 日志ID: {}", d.logid)).unwrap_or_default()
+                    );
+                    
+                    let structured = json!({
+                        "success": true,
+                        "dataset_id": dataset_id,
+                        "name": name,
+                        "format_type": format_type,
+                        "format_type_name": format_type_str,
+                        "space_id": space_id,
+                        "description": description,
+                        "file_id": file_id,
+                        "logid": response.detail.as_ref().map(|d| &d.logid)
+                    });
+                    
+                    Ok(CallToolResult {
+                        content: Some(vec![rmcp::model::Content::text(content)]),
+                        is_error: Some(false),
+                        structured_content: Some(structured),
+                    })
+                } else {
+                    // API 返回错误
+                    let error_msg = if response.msg.is_empty() {
+                        "创建知识库失败".to_string()
+                    } else {
+                        response.msg
+                    };
+                    
+                    let content = format!(
+                        "创建知识库失败:\n- 错误码: {}\n- 错误信息: {}{}",
+                        response.code,
+                        error_msg,
+                        response.detail.as_ref().map(|d| format!("\n- 日志ID: {}", d.logid)).unwrap_or_default()
+                    );
+                    
+                    let structured = json!({
+                        "success": false,
+                        "error_code": response.code,
+                        "error_message": error_msg,
+                        "logid": response.detail.as_ref().map(|d| &d.logid)
+                    });
+                    
+                    Ok(CallToolResult {
+                        content: Some(vec![rmcp::model::Content::text(content)]),
+                        is_error: Some(true),
+                        structured_content: Some(structured),
+                    })
+                }
+            }
+            Err(e) => {
+                let error_msg = format!("API 调用失败: {}", e);
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(error_msg.clone())]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({
+                        "success": false,
+                        "error": error_msg
+                    })),
+                })
+            }
+        }
+    }
+
+    /// 上传文档到知识库（本地文件）
+    pub async fn upload_document_to_knowledge_base(
+        &self,
+        args: Option<Value>,
+    ) -> Result<CallToolResult, McpError> {
+        use crate::api::knowledge_models::{
+            ChunkStrategyCn, DocumentBaseCn, KnowledgeDocumentUploadRequestCn, SourceInfo,
+        };
+        use tokio::fs;
+
+        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
+        let dataset_id = args
+            .get("dataset_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_params("Missing dataset_id", None))?;
+        let file_path = args
+            .get("file_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_params("Missing file_path", None))?;
+        let document_name = args
+            .get("document_name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                std::path::Path::new(file_path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("document")
+                    .to_string()
+            });
+        let chunk_size = args
+            .get("chunk_size")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(800);
+
+        let metadata = fs::metadata(file_path).await.map_err(|e| {
+            McpError::invalid_params(format!("Failed to read file metadata: {}", e), None)
+        })?;
+        let file_size = metadata.len();
+        if file_size == 0 {
+            return Err(McpError::invalid_params("File is empty", None));
+        }
+        if file_size > 10 * 1024 * 1024 {
+            return Err(McpError::invalid_params(
+                "File exceeds 10MB size limit for this example",
+                None,
+            ));
+        }
+
+        let bytes = fs::read(file_path)
+            .await
+            .map_err(|e| McpError::invalid_params(format!("Failed to read file: {}", e), None))?;
+        let ext = std::path::Path::new(file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+        // MIME 类型目前不直接发送（服务器依据 file_type 推断），保留扩展判断仅用于潜在后续扩展
+        // let mime_type = match ext.to_lowercase().as_str() { "txt" => "text/plain", "md" => "text/markdown", "pdf" => "application/pdf", "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document", _ => "application/octet-stream", };
+
+        let content_base64 = {
+            use base64::{engine::general_purpose, Engine as _};
+            general_purpose::STANDARD.encode(&bytes)
+        };
+        // CN spec: document_bases: [{ name, source_info{ file_base64, file_type } }]
+        let source_info = SourceInfo::file_base64(content_base64, ext.to_string());
+        let document_cn = DocumentBaseCn {
+            name: document_name.clone(),
+            source_info,
+            caption: None,
+            update_rule: None,
+        };
+        // chunk_strategy: choose custom (chunk_type=1) with separator and max_tokens
+        let separator = args
+            .get("separator")
+            .and_then(|v| v.as_str())
+            .unwrap_or("\n\n")
+            .to_string();
+        let chunk_type = 0; // custom
+        let max_tokens = chunk_size as i64; // reuse user chunk_size param as max_tokens
+        let chunk_strategy_cn = ChunkStrategyCn::text(separator, max_tokens, chunk_type);
+        let format_type = args
+            .get("format_type")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0) as i32; // default 0 text
+        let request = KnowledgeDocumentUploadRequestCn {
+            dataset_id: dataset_id.to_string(),
+            document_bases: vec![document_cn],
+            chunk_strategy: chunk_strategy_cn,
+            format_type,
+        };
+        match self.coze_client.upload_document_cn(request).await {
+            Ok(resp) => {
+                let infos_len = resp.document_infos.as_ref().map(|v| v.len()).unwrap_or(0);
+                let content = format!(
+                    "文档上传成功: dataset_id={}, 文件='{}', size={} bytes, documents_returned={}",
+                    dataset_id, document_name, file_size, infos_len
+                );
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(content)]),
                     is_error: Some(false),
-                    structured_content: Some(structured),
+                    structured_content: Some(json!({
+                        "dataset_id": dataset_id,
+                        "file_name": document_name,
+                        "file_size": file_size,
+                        "returned_count": infos_len,
+                        "code": resp.code,
+                        "msg": resp.msg,
+                    })),
                 })
             }
-            Err(e) => Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text(format!(
-                    "知识库创建失败: {}",
-                    e
-                ))]),
-                is_error: Some(true),
-                structured_content: None,
-            }),
+            Err(e) => {
+                println!("Failed to upload document: {:?}", e);
+                let serialized =
+                    serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(format!(
+                        "文档上传失败: {:?}",
+                        e
+                    ))]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": serialized})),
+                })
+            }
+        }
+    }
+
+    /// 列出会话（最小实现）
+    pub async fn list_conversations(
+        &self,
+        args: Option<Value>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
+        let workspace_id = args
+            .get("workspace_id")
+            .or_else(|| args.get("space_id"))
+            .and_then(|v| v.as_str())
+            .or_else(|| {
+                if !self.default_space_id.is_empty() {
+                    Some(&self.default_space_id)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| {
+                McpError::invalid_params("Missing workspace_id (or space_id) parameter", None)
+            })?;
+        let bot_id = args
+            .get("bot_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_params("Missing bot_id parameter", None))?;
+        let page = args.get("page").and_then(|v| v.as_u64()).unwrap_or(1);
+        let page_size = args.get("page_size").and_then(|v| v.as_u64()).unwrap_or(20);
+        match self
+            .coze_client
+            .list_conversations_v1(
+                bot_id,
+                Some(workspace_id),
+                Some(page as u32),
+                Some(page_size as u32),
+            )
+            .await
+        {
+            Ok(body) => {
+                let data = body.get("data").cloned().unwrap_or(body);
+                let (items, total) = Self::extract_list_and_total(&data);
+                let mut out = format!(
+                    "{} 条会话，page={}, page_size={}:\n\n",
+                    total, page, page_size
+                );
+                let mut sc: Vec<Value> = Vec::new();
+                for (i, it) in items.iter().take(5).enumerate() {
+                    if let Some(obj) = it.as_object() {
+                        let cid = Self::get_str(obj, "conversation_id");
+                        let title = Self::get_str(obj, "title");
+                        out.push_str(&format!("{}. {} (id: {})\n", i + 1, title, cid));
+                        sc.push(json!({"conversation_id": cid, "title": title}));
+                    }
+                }
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(out)]),
+                    is_error: Some(false),
+                    structured_content: Some(json!({"total": total, "items": sc})),
+                })
+            }
+            Err(e) => {
+                let serialized =
+                    serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(format!(
+                        "[List Conversations] 请求失败: {}",
+                        e
+                    ))]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": serialized})),
+                })
+            }
+        }
+    }
+
+    // ===== 聊天功能 =====
+    
+    /// 发送聊天消息（非流式）
+    pub async fn chat(
+        &self,
+        args: Option<Value>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = args.unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+        
+        let bot_id = match args.get("bot_id").and_then(|v| v.as_str()) {
+            Some(id) => id.to_string(),
+            None => {
+                return Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text("错误: 缺少必需的 bot_id 参数")]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": "Missing bot_id parameter"})),
+                });
+            }
+        };
+            
+        let message = match args.get("message").and_then(|v| v.as_str()) {
+            Some(msg) => msg.to_string(),
+            None => {
+                return Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text("错误: 缺少必需的 message 参数")]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": "Missing message parameter"})),
+                });
+            }
+        };
+            
+        let user_id = args.get("user_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                // 如果用户没有提供user_id，自动生成一个随机UUID
+                uuid::Uuid::new_v4().to_string()
+            });
+        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).map(|s| s.to_string());
+        
+        // 构建聊天请求（确保包含user_id，自动生成或用户提供）
+        let mut chat_request = crate::api::chat_models::ChatRequest::new(bot_id, message)
+            .with_stream(false)
+            .with_user_id(user_id.clone());  // user_id是必选参数，自动生成或用户提供
+            
+        if let Some(cid) = conversation_id {
+            chat_request = chat_request.with_conversation_id(cid);
+        }
+        
+        // 处理自定义变量
+        if let Some(variables_obj) = args.get("custom_variables") {
+            if let Some(variables_map) = variables_obj.as_object() {
+                let mut custom_vars = std::collections::HashMap::new();
+                for (k, v) in variables_map {
+                    if let Some(s) = v.as_str() {
+                        custom_vars.insert(k.clone(), s.to_string());
+                    }
+                }
+                if !custom_vars.is_empty() {
+                    chat_request = chat_request.with_custom_variables(custom_vars);
+                }
+            }
+        }
+        
+        match self.coze_client.chat(chat_request).await {
+            Ok(response) => {
+                let was_user_id_generated = !args.get("user_id")
+                    .and_then(|v| v.as_str())
+                    .is_some();
+                
+                let user_id_info = if was_user_id_generated {
+                    format!("user_id: {} (自动生成)\n", user_id)
+                } else {
+                    format!("user_id: {} (用户提供)\n", user_id)
+                };
+                
+                // 如果状态是in_progress，等待完成并获取最终消息
+                if response.status.as_deref() == Some("in_progress") || response.status.as_deref() == Some("created") {
+                    // 等待对话完成
+                    let mut final_status = response.status.clone();
+                    let mut attempts = 0;
+                    const MAX_ATTEMPTS: u32 = 30; // 最多等待30次，每次2秒
+                    
+                    while (final_status.as_deref() == Some("in_progress") || final_status.as_deref() == Some("created")) && attempts < MAX_ATTEMPTS {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                        attempts += 1;
+                        
+                        match self.coze_client.get_chat_detail(&response.conversation_id, &response.id).await {
+                            Ok(detail) => {
+                                final_status = detail.status.clone();
+                                if final_status.as_deref() == Some("completed") {
+                                    // 获取对话消息
+                                    match self.coze_client.get_chat_messages(&response.conversation_id, &response.id).await {
+                                        Ok(messages) => {
+                                            // 找到助手的回复
+                                            let assistant_reply = messages.iter()
+                                                .filter(|msg| msg.role == crate::api::chat_models::MessageRole::Assistant)
+                                                .filter_map(|msg| msg.content.as_ref())
+                                                .map(|s| s.as_str())
+                                                .collect::<Vec<_>>()
+                                                .join("\n");
+                                            
+                                            let output = format!(
+                                                "{}对话ID: {}\n消息ID: {}\n状态: {}\n\n🤖 助手回复:\n{}\n",
+                                                user_id_info,
+                                                response.conversation_id,
+                                                response.id,
+                                                final_status.as_deref().unwrap_or("completed"),
+                                                if assistant_reply.is_empty() { "暂无回复内容" } else { &assistant_reply }
+                                            );
+                                            
+                                            return Ok(CallToolResult {
+                                                content: Some(vec![rmcp::model::Content::text(output)]),
+                                                is_error: Some(false),
+                                                structured_content: Some(json!({
+                                                    "conversation_id": response.conversation_id,
+                                                    "message_id": response.id,
+                                                    "status": final_status,
+                                                    "user_id": user_id,
+                                                    "user_id_generated": was_user_id_generated,
+                                                    "assistant_reply": assistant_reply,
+                                                    "messages": messages
+                                                })),
+                                            });
+                                        }
+                                        Err(e) => {
+                                            let output = format!(
+                                                "{}对话ID: {}\n消息ID: {}\n状态: {}\n\n⚠️ 获取消息失败: {}",
+                                                user_id_info,
+                                                response.conversation_id,
+                                                response.id,
+                                                final_status.as_deref().unwrap_or("completed"),
+                                                e
+                                            );
+                                            
+                                            return Ok(CallToolResult {
+                                                content: Some(vec![rmcp::model::Content::text(output)]),
+                                                is_error: Some(true),
+                                                structured_content: Some(json!({
+                                                    "conversation_id": response.conversation_id,
+                                                    "message_id": response.id,
+                                                    "status": final_status,
+                                                    "error": format!("Failed to get messages: {}", e)
+                                                })),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                // 无法获取详情，继续等待
+                                println!("等待对话完成... (尝试 {}/{}，错误: {})", attempts, MAX_ATTEMPTS, e);
+                            }
+                        }
+                    }
+                    
+                    // 如果超时或失败
+                    let output = format!(
+                        "{}对话ID: {}\n消息ID: {}\n状态: {}\n\n⏰ 等待超时或对话未完成，请稍后手动查询结果",
+                        user_id_info,
+                        response.conversation_id,
+                        response.id,
+                        final_status.as_deref().unwrap_or("timeout")
+                    );
+                    
+                    Ok(CallToolResult {
+                        content: Some(vec![rmcp::model::Content::text(output)]),
+                        is_error: Some(false),
+                        structured_content: Some(json!({
+                            "conversation_id": response.conversation_id,
+                            "message_id": response.id,
+                            "status": final_status,
+                            "timeout": true
+                        })),
+                    })
+                } else {
+                    // 对话已经完成或有其他状态
+                    let output = format!(
+                        "{}对话ID: {}\n消息ID: {}\n状态: {}\n",
+                        user_id_info,
+                        response.conversation_id,
+                        response.id,
+                        response.status.as_deref().unwrap_or("unknown")
+                    );
+                    
+                    Ok(CallToolResult {
+                        content: Some(vec![rmcp::model::Content::text(output)]),
+                        is_error: Some(false),
+                        structured_content: Some(serde_json::to_value(&response).unwrap_or_default()),
+                    })
+                }
+            }
+            Err(e) => {
+                let error_msg = format!("[Chat] 聊天失败: {}", e);
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(error_msg)]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": e.to_string()})),
+                })
+            }
+        }
+    }
+    
+    /// 发送流式聊天消息
+    pub async fn chat_stream(
+        &self,
+        args: Option<Value>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = args.unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+        
+        let bot_id = args
+            .get("bot_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_params("Missing bot_id parameter", None))?
+            .to_string();
+            
+        let message = args
+            .get("message")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_params("Missing message parameter", None))?
+            .to_string();
+            
+        let user_id = args.get("user_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                // 如果用户没有提供user_id，自动生成一个随机UUID
+                uuid::Uuid::new_v4().to_string()
+            });
+        let conversation_id = args.get("conversation_id").and_then(|v| v.as_str()).map(|s| s.to_string());
+        
+        // 构建聊天请求（确保包含user_id，自动生成或用户提供）
+        let mut chat_request = crate::api::chat_models::ChatRequest::new(bot_id, message)
+            .with_stream(true)
+            .with_user_id(user_id.clone());  // user_id是必选参数，自动生成或用户提供
+            
+        if let Some(cid) = conversation_id {
+            chat_request = chat_request.with_conversation_id(cid);
+        }
+        
+        // 处理自定义变量
+        if let Some(variables_obj) = args.get("custom_variables") {
+            if let Some(variables_map) = variables_obj.as_object() {
+                let mut custom_vars = std::collections::HashMap::new();
+                for (k, v) in variables_map {
+                    if let Some(s) = v.as_str() {
+                        custom_vars.insert(k.clone(), s.to_string());
+                    }
+                }
+                if !custom_vars.is_empty() {
+                    chat_request = chat_request.with_custom_variables(custom_vars);
+                }
+            }
+        }
+        
+        match self.coze_client.chat_stream(chat_request).await {
+            Ok(stream) => {
+                use futures::StreamExt;
+                
+                let mut full_content = String::new();
+                let mut conversation_id = String::new();
+                let mut message_id = String::new();
+                let mut final_usage: Option<crate::api::chat_models::ChatUsage> = None;
+                let mut events = Vec::new();
+                
+                // Pin the stream to make it ready for iteration
+                tokio::pin!(stream);
+                
+                // 收集流式响应
+                while let Some(result) = stream.next().await {
+                    match result {
+                        Ok(response) => {
+                            events.push(serde_json::to_value(&response).unwrap_or_default());
+                            
+                            // 更新会话信息
+                            if let Some(cid) = &response.conversation_id {
+                                conversation_id = cid.clone();
+                            }
+                            if let Some(mid) = &response.id {
+                                message_id = mid.clone();
+                            }
+                            
+                            // 累积内容
+                            if let Some(delta) = &response.delta {
+                                if let Some(content) = &delta.content {
+                                    full_content.push_str(content);
+                                }
+                            }
+                            
+                            // 保存最终使用情况
+                            if let Some(usage) = &response.usage {
+                                final_usage = Some(usage.clone());
+                            }
+                            
+                            // 检查是否完成
+                            match response.event {
+                                crate::api::chat_models::StreamEventType::Done |
+                                crate::api::chat_models::StreamEventType::ConversationChatCompleted => {
+                                    break;
+                                }
+                                crate::api::chat_models::StreamEventType::ConversationChatFailed => {
+                                    return Ok(CallToolResult {
+                                        content: Some(vec![rmcp::model::Content::text(
+                                            format!("[Chat Stream] 聊天失败: {:?}", response.last_error)
+                                        )]),
+                                        is_error: Some(true),
+                                        structured_content: Some(json!({
+                                            "error": "chat_failed",
+                                            "last_error": response.last_error,
+                                            "events": events
+                                        })),
+                                    });
+                                }
+                                _ => continue,
+                            }
+                        }
+                        Err(e) => {
+                            return Ok(CallToolResult {
+                                content: Some(vec![rmcp::model::Content::text(
+                                    format!("[Chat Stream] 流式响应错误: {}", e)
+                                )]),
+                                is_error: Some(true),
+                                structured_content: Some(json!({
+                                    "error": e.to_string(),
+                                    "events": events
+                                })),
+                            });
+                        }
+                    }
+                }
+                
+                let output = format!(
+                    "对话ID: {}\n消息ID: {}\n完整回复:\n{}\n\n使用情况: {:?}",
+                    conversation_id,
+                    message_id,
+                    full_content,
+                    final_usage
+                );
+                
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(output)]),
+                    is_error: Some(false),
+                    structured_content: Some(json!({
+                        "conversation_id": conversation_id,
+                        "message_id": message_id,
+                        "content": full_content,
+                        "usage": final_usage,
+                        "events": events
+                    })),
+                })
+            }
+            Err(e) => {
+                let error_msg = format!("[Chat Stream] 流式聊天失败: {}", e);
+                Ok(CallToolResult {
+                    content: Some(vec![rmcp::model::Content::text(error_msg)]),
+                    is_error: Some(true),
+                    structured_content: Some(json!({"error": e.to_string()})),
+                })
+            }
         }
     }
 }

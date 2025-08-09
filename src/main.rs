@@ -1,5 +1,5 @@
 mod api;
-mod knowledge;
+// knowledge module removed after pruning
 mod models;
 mod tools;
 
@@ -20,17 +20,15 @@ use tracing_subscriber;
 
 use crate::api::endpoints::COZE_BASE_URL;
 use crate::api::CozeApiClient;
-use crate::knowledge::KnowledgeManager;
 use crate::tools::config_tool::ConfigTool;
 use crate::tools::coze_tools::CozeTools;
 
 #[derive(Clone)]
 pub struct CozeServer {
-    coze_client: Arc<CozeApiClient>,
-    knowledge_manager: Arc<KnowledgeManager>,
+    _coze_client: Arc<CozeApiClient>,
     tools: Arc<CozeTools>,
     config_tool: Arc<ConfigTool>,
-    default_space_id: String,
+    _default_space_id: String,
 }
 
 impl CozeServer {
@@ -41,24 +39,18 @@ impl CozeServer {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let coze_client_instance = CozeApiClient::new(api_base_url, api_token)?;
         let coze_client = Arc::new(coze_client_instance);
-        let knowledge_manager = Arc::new(KnowledgeManager::new(
-            (*coze_client).clone(),
-            knowledge::KnowledgeConfig::default(),
-        ));
         let tools = Arc::new(CozeTools::new(
             coze_client.clone(),
-            knowledge_manager.clone(),
             default_space_id.clone(),
         ));
         // 将客户端注入到配置工具中，以便运行时更新 API Key 能影响后续请求
         let config_tool = Arc::new(ConfigTool::new().with_client(coze_client.clone()));
 
         Ok(Self {
-            coze_client,
-            knowledge_manager,
+            _coze_client: coze_client,
             tools,
             config_tool,
-            default_space_id,
+            _default_space_id: default_space_id,
         })
     }
 }
@@ -75,19 +67,11 @@ impl ServerHandler for CozeServer {
         info!("Calling tool: {}", tool_name);
 
         let result: Result<CallToolResult, McpError> = match &tool_name[..] {
-            "set_api_key" => {
-                if let Some(map) = params.arguments.as_ref() {
-                    self.config_tool.set_api_key_from_args(map).await
-                } else {
-                    Err(McpError::invalid_params("Missing arguments", None))
-                }
-            }
-            "list_workspaces" => self.tools.list_workspaces(args_value.clone()).await,
             "list_bots" => self.tools.list_bots(args_value.clone()).await,
             "list_knowledge_bases" => self.tools.list_knowledge_bases(args_value.clone()).await,
-            "create_knowledge_base_v2" => {
+            "create_dataset" => {
                 self.tools
-                    .create_knowledge_base_v2(args_value.clone())
+                    .create_dataset(args_value.clone())
                     .await
             }
             "upload_document_to_knowledge_base" => {
@@ -96,6 +80,8 @@ impl ServerHandler for CozeServer {
                     .await
             }
             "list_conversations" => self.tools.list_conversations(args_value.clone()).await,
+            "chat" => self.tools.chat(args_value.clone()).await,
+            "chat_stream" => self.tools.chat_stream(args_value.clone()).await,
             "ping" => Ok(CallToolResult {
                 content: Some(vec![rmcp::model::Content::text("pong")]),
                 is_error: Some(false),
@@ -114,53 +100,43 @@ impl ServerHandler for CozeServer {
         _params: Option<PaginatedRequestParam>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, McpError> {
-        // 精选10个最常用的工具
+        // 精选7个最常用的工具
         let tools = vec![
-            // 1. 配置管理 - 必需
-            Tool {
-                name: "set_api_key".into(),
-                description: Some("设置Coze API Key".into()),
-                input_schema: Arc::new(serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "api_key": {
-                            "type": "string",
-                            "description": "Coze个人访问令牌 (以pat_开头)"
-                        }
-                    },
-                    "required": ["api_key"]
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
-            // 2. 工作空间管理 - 基础功能
-            Tool {
-                name: "list_workspaces".into(),
-                description: Some("列出所有工作空间".into()),
-                input_schema: Arc::new(serde_json::json!({
-                    "type": "object",
-                    "properties": {}
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
-            // 3. Bot管理 - 核心功能
+            // 1. Bot管理 - 核心功能
             Tool {
                 name: "list_bots".into(),
-                description: Some("列出Bots".into()),
+                description: Some("列出智能体列表 - 支持按发布状态、分页等条件筛选".into()),
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
-                        "workspace_id": { "type": "string", "description": "工作区ID (可选，使用默认space_id)" },
-                        "page": { "type": "number", "description": "页码，默认1" },
-                        "page_size": { "type": "number", "description": "每页数量，默认20" }
+                        "workspace_id": { 
+                            "type": "string", 
+                            "description": "工作区ID (必填，或使用默认space_id)" 
+                        },
+                        "publish_status": { 
+                            "type": "string", 
+                            "enum": ["all", "published_online", "published_draft", "unpublished_draft"],
+                            "description": "发布状态筛选：all(全部)、published_online(已发布正式版)、published_draft(已发布草稿)、unpublished_draft(未发布)，默认published_online" 
+                        },
+                        "connector_id": { 
+                            "type": "string", 
+                            "description": "渠道ID，默认1024(API渠道)" 
+                        },
+                        "page": { 
+                            "type": "number", 
+                            "description": "页码，默认1" 
+                        },
+                        "page_size": { 
+                            "type": "number", 
+                            "description": "每页数量，默认20" 
+                        }
                     },
                     "required": []
                 }).as_object().unwrap().clone()),
                 annotations: None,
                 output_schema: None,
             },
-            // 4. 知识库管理 - 核心功能
+            // 2. 知识库管理 - 核心功能
             Tool {
                 name: "list_knowledge_bases".into(),
                 description: Some("列出所有知识库".into()),
@@ -177,24 +153,41 @@ impl ServerHandler for CozeServer {
                 annotations: None,
                 output_schema: None,
             },
-            // 5. 知识库创建 - 重要功能
+            // 3. 标准知识库创建 API - 符合官方文档规范
             Tool {
-                name: "create_knowledge_base_v2".into(),
-                description: Some("创建知识库".into()),
+                name: "create_dataset".into(),
+                description: Some("创建知识库（使用标准 v1/datasets API，符合官方文档规范）".into()),
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
-                        "name": { "type": "string", "description": "知识库名称" },
-                        "description": { "type": "string", "description": "知识库描述（可选）" },
-                        "space_id": { "type": "string", "description": "空间ID（可选，使用默认space_id）" },
-                        "permission": { "type": "string", "enum": ["private", "public"], "description": "权限类型（可选，默认private）" }
+                        "name": { 
+                            "type": "string", 
+                            "description": "知识库名称，长度不超过100个字符" 
+                        },
+                        "space_id": { 
+                            "type": "string", 
+                            "description": "知识库所在空间的唯一标识（可选，使用默认space_id）" 
+                        },
+                        "format_type": { 
+                            "type": "number", 
+                            "enum": [0, 2],
+                            "description": "知识库类型：0-文本类型，2-图片类型" 
+                        },
+                        "description": { 
+                            "type": "string", 
+                            "description": "知识库描述信息（可选）" 
+                        },
+                        "file_id": { 
+                            "type": "string", 
+                            "description": "知识库图标文件ID（可选），需通过【上传文件】API获取" 
+                        }
                     },
-                    "required": ["name"]
+                    "required": ["name", "format_type"]
                 }).as_object().unwrap().clone()),
                 annotations: None,
                 output_schema: None,
             },
-            // 6. 文档上传 - 重要功能
+            // 4. 文档上传 - 重要功能
             Tool {
                 name: "upload_document_to_knowledge_base".into(),
                 description: Some("上传本地文档到知识库".into()),
@@ -212,7 +205,7 @@ impl ServerHandler for CozeServer {
                 annotations: None,
                 output_schema: None,
             },
-            // 7. 会话管理 - 核心功能
+            // 5. 会话管理 - 核心功能
             Tool {
                 name: "list_conversations".into(),
                 description: Some("列出对话".into()),
@@ -225,6 +218,50 @@ impl ServerHandler for CozeServer {
                         "page_size": { "type": "number", "description": "每页数量，默认20" }
                     },
                     "required": ["bot_id"]
+                }).as_object().unwrap().clone()),
+                annotations: None,
+                output_schema: None,
+            },
+            // 6. 聊天对话 - 重要功能
+            Tool {
+                name: "chat".into(),
+                description: Some("发送聊天消息（非流式）".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "bot_id": { "type": "string", "description": "Bot ID（必填）" },
+                        "message": { "type": "string", "description": "要发送的消息内容（必填）" },
+                        "user_id": { "type": "string", "description": "用户ID（可选）" },
+                        "conversation_id": { "type": "string", "description": "对话ID（可选，不提供则创建新对话）" },
+                        "custom_variables": { 
+                            "type": "object", 
+                            "description": "自定义变量（可选）",
+                            "additionalProperties": { "type": "string" }
+                        }
+                    },
+                    "required": ["bot_id", "message"]
+                }).as_object().unwrap().clone()),
+                annotations: None,
+                output_schema: None,
+            },
+            // 7. 流式聊天对话 - 重要功能
+            Tool {
+                name: "chat_stream".into(),
+                description: Some("发送流式聊天消息".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "bot_id": { "type": "string", "description": "Bot ID（必填）" },
+                        "message": { "type": "string", "description": "要发送的消息内容（必填）" },
+                        "user_id": { "type": "string", "description": "用户ID（可选）" },
+                        "conversation_id": { "type": "string", "description": "对话ID（可选，不提供则创建新对话）" },
+                        "custom_variables": { 
+                            "type": "object", 
+                            "description": "自定义变量（可选）",
+                            "additionalProperties": { "type": "string" }
+                        }
+                    },
+                    "required": ["bot_id", "message"]
                 }).as_object().unwrap().clone()),
                 annotations: None,
                 output_schema: None,

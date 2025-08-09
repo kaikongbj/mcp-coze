@@ -1,219 +1,153 @@
-# Coze MCP 服务器使用说明（CN-only）
+# Coze MCP 服务器使用说明（Trae版）
 
-本服务器固定对接中国区 Coze API（<https://api.coze.cn>），当前仅通过 stdio 传输作为 MCP Provider 使用。
+## 🎯 功能概述
 
-## 启动方式
+本MCP服务器提供两个核心功能：
+- **上传文件到知识库**：支持PDF、docx、xlsx、pptx、md、txt格式，单个文件≤100MB
+- **与机器人聊天**：基于已创建的机器人进行对话交互
 
-### 1) 命令行参数（推荐）
+## 📋 使用前的准备
 
-```powershell
-# Windows PowerShell
-./coze-mcp-server.exe -t YOUR_COZE_API_TOKEN -s YOUR_SPACE_ID
+### 第1步：获取API信息
 
-# 或使用完整参数名
-./coze-mcp-server.exe --coze-api-token YOUR_COZE_API_TOKEN --space-id YOUR_SPACE_ID
-```
+#### 1.1 获取个人访问令牌（必填）
 
-```bash
-# Linux / macOS
-./coze-mcp-server -t YOUR_COZE_API_TOKEN -s YOUR_SPACE_ID
-```
+1. 访问 [Coze官网](https://www.coze.cn) 并登录账号
+2. 点击页面左下角的 **"扣子API"**
+3. 选择 **"API令牌"** → **"添加新令牌"**
+4. 填写信息：
+   - **令牌名称**：任意填写（如：trae-mcp）
+   - **过期时间**：根据需要选择
+   - **访问团队空间**：选择要访问的空间
+   - **权限**：勾选所需权限（建议全选）
+5. 点击 **"生成令牌"**，**立即复制并保存**（令牌只显示一次）
 
-### 2) 环境变量
+#### 1.2 获取空间ID（必填）
 
-```powershell
-# Windows PowerShell（当前会话）
-$env:COZE_API_TOKEN="your_api_token_here"
-$env:COZE_SPACE_ID="your_space_id_here"
-./coze-mcp-server.exe
-```
+**方法1：通过URL获取（推荐）**
+1. 登录 [Coze开发平台](https://www.coze.cn/home)
+2. 查看浏览器地址栏，格式为：`https://www.coze.cn/home?workspace={空间ID}`
+3. 复制`workspace=`后面的数字，这就是你的空间ID
 
-```bash
-# Linux / macOS
-export COZE_API_TOKEN=your_api_token_here
-export COZE_SPACE_ID=your_space_id_here
-./coze-mcp-server
-```
+**方法2：通过页面获取**
+1. 登录 [Coze开发平台](https://www.coze.cn/home)
+2. 点击左侧菜单 **"工作空间"**
+3. 在页面右上角点击当前空间名称
+4. 在下拉菜单中选择 **"空间设置"**
+5. 在设置页面中找到 **"空间ID"**，复制该数字
 
-### 3) 使用 Cargo 运行（开发模式）
+### 第2步：创建知识库（重要！）
 
-```bash
-# 设置环境变量后运行
-cargo run -- --coze-api-token YOUR_COZE_API_TOKEN --space-id YOUR_SPACE_ID
+⚠️ **注意：不能通过Trae创建知识库，必须在Coze平台手动创建**
 
-# 或使用环境变量
-export COZE_API_TOKEN=your_api_token_here
-export COZE_SPACE_ID=your_space_id_here
-cargo run
-```
+1. 登录 [Coze开发平台](https://www.coze.cn/home)
+2. 进入你的工作空间
+3. 点击 **"知识库"** → **"创建知识库"**
+4. 填写信息：
+   - **名称**：任意填写（如：项目文档）
+   - **描述**：可选填写
+   - **权限**：选择"私有"或"公开"
+5. 点击 **"创建"**，记住创建的知识库名称
 
-### 4) 使用 Cargo 运行（发布模式）
+### 第3步：Trae MCP配置
 
-```bash
-# 构建发布版本
-cargo build --release
-
-# 运行发布版本
-./target/release/coze-mcp-server --coze-api-token YOUR_COZE_API_TOKEN --space-id YOUR_SPACE_ID
-```
-
-提示：若同时提供环境变量与命令行参数，命令行参数优先。
-
-## 参数说明
-
-| 参数 | 简写 | 环境变量 | 说明 | 必需 |
-|------|------|----------|------|------|
-| --coze-api-token | -t | COZE_API_TOKEN | Coze API访问令牌 (以 pat_ 开头) | 是 |
-| --space-id | -s | COZE_SPACE_ID | 默认空间ID | 否 |
-| --base-url | -b | COZE_BASE_URL | API基础URL（默认：https://api.coze.cn） | 否 |
-| --log-level | -l | RUST_LOG | 日志级别（debug, info, warn, error） | 否 |
-
-## 获取 API Token 与 Space ID（中国区）
-
-- API Token：登录 <https://www.coze.cn> → 个人设置 → 开发者设置 → 生成个人令牌（pat_xxx）
-- Space ID：登录 Coze 平台 → 空间管理页面 → 复制 Space ID
-
-## Claude Desktop 配置示例
-
-```json
+1. 打开Trae编辑器
+2. 进入 **设置** → **MCP** → **添加MCP服务器**
+3. 填写配置：
 {
   "mcpServers": {
     "coze": {
-      "command": "D:\\mcp-coze\\target\\release\\coze-mcp-server.exe",
+      "command": "D:/mcp-coze/target/debug/coze-mcp-server.exe",
       "args": [
-        "--coze-api-token",
-        "pat_your_actual_token_here",
+        "--api-key",
+        "pat_8NU7DXjMPg4O7rg4tbt8ZYzKkHRIMTZ8SKANbdYdjf0vMPKR7CbKsn0biE9TKcDi",
         "--space-id",
-        "your_actual_space_id"
+        "7409828301432356875"
       ]
     }
   }
 }
+     ```
+
+## 🚀 功能使用
+
+### 📁 上传文件到知识库
+
+**支持格式**：PDF、docx、xlsx、pptx、md、txt
+**大小限制**：单个文件≤100MB
+
+**操作步骤**：
+1. 在Trae中与AI对话：
+   ```
+   我：请将这个文件上传到知识库"项目文档"
+   [选择文件]
+   ```
+2. AI会自动调用MCP服务器上传文件
+3. 等待上传完成提示
+
+**示例对话**：
+```
+用户：请上传这个PDF文档到我的"项目文档"知识库
+AI：我来帮您上传文件到知识库"项目文档"
+[文件上传中...]
+✅ 文件上传成功！已添加到知识库"项目文档"
 ```
 
-## 命令行快速测试
+### 💬 与机器人聊天
 
-```powershell
-# Windows PowerShell
-./coze-mcp-server.exe --help
+**前提条件**：已在Coze平台创建并发布机器人
+
+**操作步骤**：
+1. 在Trae中与AI对话：
+   ```
+   我：请与机器人"我的助手"对话：你好，介绍一下你自己
+   ```
+2. AI会自动调用MCP服务器与指定机器人对话
+3. 获取机器人的回复
+
+**示例对话**：
+```
+用户：请让机器人"客服助手"回答：你们提供什么服务？
+AI：我来帮您与机器人"客服助手"对话
+机器人回复：我们提供24小时在线客服支持，包括产品咨询、技术支持和售后服务。
 ```
 
-```bash
-# Linux / macOS
-./coze-mcp-server --help
-```
+## 🔍 故障排除
 
-## 支持的工具（43个完整列表）
+### ❌ 找不到知识库
+**原因**：知识库未在Coze平台创建
+**解决**：
+1. 登录 [Coze开发平台](https://www.coze.cn/home)
+2. 进入 **知识库** 页面确认知识库是否存在
+3. 如不存在，点击 **"创建知识库"** 手动创建
 
-### 配置管理 (3个)
-- `set_api_key`: 设置API密钥
-- `get_config_status`: 获取配置状态
-- `test_connection`: 测试API连接
+### ❌ 令牌无效
+**原因**：API令牌错误或已过期
+**解决**：
+1. 检查Trae MCP配置中的`COZE_API_KEY`是否正确
+2. 重新生成新的API令牌
+3. 更新Trae中的环境变量配置
 
-### 知识库管理 (4个)
-- `list_knowledge_bases`: 列出知识库
-- `create_knowledge_base`: 创建知识库
-- `upload_document`: 上传文档到知识库
-- `get_knowledge_base`: 获取知识库详情
+### ❌ 空间ID错误
+**原因**：空间ID格式错误或无权访问
+**解决**：
+1. 确认空间ID为纯数字格式
+2. 检查是否有该空间的访问权限
+3. 重新按照第1步获取正确的空间ID
 
-#### 知识库文件上传示例
+## ⚡ 快速操作清单
 
-```bash
-# 创建知识库
-coze-mcp-server create_knowledge_base --name "技术文档库" --description "存储技术文档和API说明" --permission private
+| 操作 | 对话示例 |
+|------|----------|
+| 查看知识库列表 | "请列出我的所有知识库" |
+| 上传文件 | "请将[文件]上传到知识库[名称]" |
+| 与机器人对话 | "请让机器人[名称]回答：[问题]" |
+| 查看机器人列表 | "请列出我的所有机器人" |
 
-# 上传PDF文档
-coze-mcp-server upload_document --dataset-id YOUR_DATASET_ID --file-path ./api-doc.pdf --file-name "API文档" --file-type pdf
+## 📞 技术支持
 
-# 上传Markdown文档
-coze-mcp-server upload_document --dataset-id YOUR_DATASET_ID --file-path ./README.md --file-name "项目说明" --file-type md
-```
-
-支持文件类型：pdf, docx, xlsx, pptx, md, txt
-单文件大小限制：100MB
-
-### 工作空间管理 (4个)
-- `list_workspaces`: 列出工作空间
-- `list_workspace_ids`: 列出工作空间ID列表
-- `get_workspace`: 获取工作空间详情
-- `find_workspace_id_by_name`: 按名称查找工作空间ID
-
-### Bot管理 (4个)
-- `list_bots`: 列出Bots
-- `get_bot`: 获取Bot详情
-- `list_bot_ids`: 列出Bot ID列表
-- `find_bot_id_by_name`: 按名称查找Bot ID
-
-### 工作流管理 (4个)
-- `list_workflows`: 列出工作流
-- `get_workflow`: 获取工作流详情
-- `list_workflow_ids`: 列出工作流ID列表
-- `find_workflow_id_by_name`: 按名称查找工作流ID
-
-### 会话管理 (11个)
-- `list_conversations`: 列出会话
-- `get_conversation`: 获取会话详情
-- `list_conversation_ids`: 列出会话ID列表
-- `count_conversations`: 统计会话数量
-- `get_conversation_overview`: 获取会话概览
-- `search_conversations_by_title`: 按标题搜索会话
-- `get_conversation_duration`: 获取会话时长
-- `get_conversation_participants`: 获取参与者
-- `get_conversation_timeline`: 获取时间线
-- `get_conversation_stats`: 获取会话统计
-
-### 消息管理 (8个)
-- `list_conversation_messages`: 列出会话消息
-- `get_conversation_first_message`: 获取会话首条消息
-- `get_conversation_last_message`: 获取会话最新消息
-- `get_conversation_message_range`: 按范围获取消息
-- `search_conversation_messages`: 搜索会话消息
-- `get_message_by_index`: 按索引获取消息
-- `count_conversation_messages`: 统计消息数量
-- `get_message_index_by_id`: 按ID获取消息索引
-
-### 数据导出 (7个)
-- `export_conversation_markdown`: 导出为Markdown
-- `export_conversation_json`: 导出为JSON
-- `export_conversation_csv`: 导出为CSV
-- `export_conversation_ndjson`: 导出为NDJSON
-- `export_conversation_pairs`: 导出为问答对
-- `export_conversation_html`: 导出为HTML
-- `export_conversation_text`: 导出为纯文本
-
-### 统计分析 (2个)
-- `get_message_length_stats`: 获取消息长度统计
-- `retrieve_message_local`: 按message_id本地检索
-
-### 新增工具 structured_content 形状示例
-
-- list_bot_ids → [{ bot_id, name }]
-- list_workflow_ids → [{ workflow_id, name }]
-- list_knowledge_base_ids → [{ dataset_id, name }]
-- list_workspace_ids → [{ workspace_id, name }]
-- get_workflow → { workflow_id, name, status, create_time }
-- get_conversation_first_message → { message_id, index?, role, content, created_at? }
-- get_conversation_message_range → { start, end, items: [ { index?, message_id, role, content, created_at? } ] }
-- export_conversation_markdown → { conversation_id, title, total, markdown, direction }
-
-## Space ID 的默认行为
-
-当通过命令行或环境变量设置了默认 space_id 后：
-
-- 需要 space_id/workspace_id 的工具可不再显式传参
-- 工具调用显式传入的 space_id 优先级高于默认值
-
-## 故障排除（Windows 常见）
-
-1) 构建测试失败：failed to remove ... coze-mcp-server.exe (os error 5)
-
-- 原因：Windows 正在运行的同名进程会锁定 target\debug 二进制，`cargo test --tests --no-run` 在覆盖时删除失败。
-- 解决：先结束已运行的 `coze-mcp-server.exe` 再执行；或使用 `cargo check` 做快速验证。
-
-1) 认证或权限错误
-
-- 确认 `Authorization: Bearer pat_xxx` 令牌有效且有目标空间权限。
-
-1) 连接问题
-
-- 网络可达性检查；可用 `test_connection` 工具快速验证。
+如遇到问题，请按以下顺序检查：
+1. ✅ 确认已在Coze平台创建知识库
+2. ✅ 确认API令牌有效且有访问权限
+3. ✅ 确认空间ID正确
+4. ✅ 确认Trae MCP配置无误

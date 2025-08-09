@@ -1,11 +1,8 @@
 use crate::api::endpoints::{
-    CHAT_COMPLETION_CN, CHAT_COMPLETION_URL,
     KNOWLEDGE_DOCUMENT_CREATE_URL,
 };
-use crate::api::error::ApiError;
-use crate::api::knowledge_models::{
-    ChatCompletionRequest, ChatCompletionResponse,
-};
+use crate::api::error::{ApiError, ApiErrorData};
+// Chat completion models removed (unused)
 use crate::models::{CozeApiRequest, CozeApiResponse, HttpMethod};
 use reqwest::{Client, Response};
 use serde_json::json;
@@ -24,7 +21,7 @@ impl CozeApiClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .map_err(|e| ApiError::ConfigError(format!("Failed to build HTTP client: {}", e)))?;
+            .map_err(|e| ApiError::ConfigError(ApiErrorData::new("config", format!("Failed to build HTTP client: {}", e), None, None)))?;
 
         Ok(Self {
             client,
@@ -43,7 +40,9 @@ impl CozeApiClient {
         let request = self.client
             .request(method.parse().unwrap(), url)
             .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json");
+            .header("Content-Type", "application/json")
+            // Per official upload spec: include Agw-Js-Conv to preserve numeric precision (harmless elsewhere)
+            .header("Agw-Js-Conv", "str");
 
         let request = match body {
             Some(b) => request.json(&b),
@@ -77,8 +76,7 @@ impl CozeApiClient {
         documents: Vec<crate::api::knowledge_models::DocumentBase>,
         chunk_strategy: Option<crate::api::knowledge_models::ChunkStrategy>,
     ) -> Result<crate::api::knowledge_models::KnowledgeDocumentCreateResponse, ApiError> {
-        use crate::api::knowledge_models::KnowledgeDocumentCreateRequest;
-        use crate::api::endpoints::KNOWLEDGE_DOCUMENT_CREATE_URL;
+    use crate::api::knowledge_models::KnowledgeDocumentCreateRequest;
         let url = format!("{}/{}", self.base_url, KNOWLEDGE_DOCUMENT_CREATE_URL);
         let req = KnowledgeDocumentCreateRequest {
             dataset_id: dataset_id.to_string(),
@@ -91,19 +89,21 @@ impl CozeApiClient {
         self.process_response(resp).await
     }
 
-    pub async fn chat_completion(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse, ApiError> {
-        let url = format!("{}/{}", self.base_url, CHAT_COMPLETION_URL);
-        
-        let response = self.send_raw_request("POST", &url, Some(serde_json::to_value(&request)?)).await?;
-        self.process_response(response).await
+    /// CN Spec aligned upload (document_bases -> name + source_info)
+    pub async fn upload_document_cn(
+        &self,
+        req: crate::api::knowledge_models::KnowledgeDocumentUploadRequestCn,
+    ) -> Result<crate::api::knowledge_models::KnowledgeDocumentUploadResponseCn, ApiError> {
+        let url = format!("{}{}", self.base_url, KNOWLEDGE_DOCUMENT_CREATE_URL);
+    let sanitized = req.sanitized();
+    let payload = serde_json::to_value(&sanitized).map_err(ApiError::from)?;
+        println!("Upload payload: {:?}", payload);
+        let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
+        println!("Upload response: {:?}", resp);
+        self.process_response(resp).await
     }
 
-    pub async fn chat_completion_cn(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse, ApiError> {
-        let url = format!("{}/{}", self.base_url, CHAT_COMPLETION_CN);
-        
-        let response = self.send_raw_request("POST", &url, Some(serde_json::to_value(&request)?)).await?;
-        self.process_response(response).await
-    }
+    // chat_completion methods removed (tool layer does not expose)
 
     // ---- Public high-level generic request used by CozeTools ----
     pub async fn execute_request(&self, req: CozeApiRequest) -> Result<CozeApiResponse, ApiError> {
@@ -172,20 +172,7 @@ impl CozeApiClient {
         self.process_response(resp).await
     }
 
-    pub async fn retrieve_conversation_v1(&self, conversation_id: &str) -> Result<serde_json::Value, ApiError> {
-        use crate::api::endpoints::conversation::GET_CONVERSATION;
-        let url = format!("{}{}?conversation_id={}", self.base_url, GET_CONVERSATION, encode(conversation_id));
-        let resp = self.send_raw_request("GET", &url, None).await?;
-        self.process_response(resp).await
-    }
-
-    pub async fn get_conversation_messages_v3(&self, conversation_id: &str) -> Result<serde_json::Value, ApiError> {
-        use crate::api::endpoints::conversation::GET_MESSAGES;
-        let path = GET_MESSAGES.replace("{conversation_id}", conversation_id);
-        let url = format!("{}{}", self.base_url, path);
-        let resp = self.send_raw_request("GET", &url, None).await?;
-        self.process_response(resp).await
-    }
+    // retrieve_conversation_v1 & get_conversation_messages_v3 removed (not used)
 
     pub async fn list_conversations_v1(
         &self,
@@ -200,6 +187,21 @@ impl CozeApiClient {
         if let Some(p) = page { url.push_str(&format!("&page={}", p)); }
         if let Some(ps) = page_size { url.push_str(&format!("&page_size={}", ps)); }
         let resp = self.send_raw_request("GET", &url, None).await?;
+        self.process_response(resp).await
+    }
+
+    /// 创建知识库 (符合 POST /v1/datasets API 文档规范)
+    pub async fn create_dataset(
+        &self,
+        request: crate::api::knowledge_models::CreateDatasetRequest,
+    ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
+        use crate::api::endpoints::datasets_v1::CREATE_DATASETS;
+        let url = format!("{}{}", self.base_url, CREATE_DATASETS);
+        
+        // 将请求转换为 JSON 格式
+        let payload = serde_json::to_value(&request).map_err(ApiError::from)?;
+        
+        let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
         self.process_response(resp).await
     }
 
@@ -234,8 +236,8 @@ impl CozeApiClient {
     ) -> Result<crate::api::ListKnowledgeBasesResponse, ApiError> {
         use crate::api::endpoints::datasets_v1::LIST_DATASETS;
         // Basic validation according to doc: page_num >=1, page_size 1..=300
-        if let Some(pn) = page_num { if pn == 0 { return Err(ApiError::BadRequest("page_num must be >= 1".into())); } }
-        if let Some(ps) = page_size { if ps == 0 || ps > 300 { return Err(ApiError::BadRequest("page_size must be in 1..=300".into())); } }
+    if let Some(pn) = page_num { if pn == 0 { return Err(ApiError::BadRequest(ApiErrorData::new("bad_request", "page_num must be >= 1".to_string(), None, None))); } }
+    if let Some(ps) = page_size { if ps == 0 || ps > 300 { return Err(ApiError::BadRequest(ApiErrorData::new("bad_request", "page_size must be in 1..=300".to_string(), None, None))); } }
         let mut url = format!("{}{}?space_id={}", self.base_url, LIST_DATASETS, encode(space_id));
         if let Some(n) = name { if !n.is_empty() { url.push_str(&format!("&name={}", encode(n))); } }
         if let Some(f) = format_type { url.push_str(&format!("&format_type={}", f)); }
@@ -294,6 +296,284 @@ impl CozeApiClient {
             }); } }
         }
         Ok(crate::api::ListKnowledgeBasesResponse { datasets, total })
+    }
+
+    // ---- Chat API methods ----
+    
+    /// 发送聊天请求（非流式）
+    pub async fn chat(
+        &self,
+        request: crate::api::chat_models::ChatRequest,
+    ) -> Result<crate::api::chat_models::ChatResponse, ApiError> {
+        use crate::api::endpoints::chat::CHAT_V3;
+        let url = format!("{}{}", self.base_url, CHAT_V3);
+        
+        let mut req = request;
+        req.stream = Some(false); // 确保非流式
+        
+        let payload = serde_json::to_value(&req).map_err(ApiError::from)?;
+        let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
+        
+        // 解析响应
+        let status = resp.status();
+        let body = resp.text().await?;
+        
+        if !status.is_success() {
+            return Err(ApiError::from_response(status, body));
+        }
+        
+        // 尝试解析为标准响应格式
+        let response_value: serde_json::Value = serde_json::from_str(&body)
+            .map_err(ApiError::from)?;
+        
+        // 检查是否有业务错误
+        if let Some(code) = response_value.get("code") {
+            if let Some(code_num) = code.as_i64() {
+                if code_num != 0 {
+                    let msg = response_value.get("msg")
+                        .or_else(|| response_value.get("message"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error");
+                    return Err(ApiError::BadRequest(ApiErrorData::new(
+                        "api_error",
+                        format!("API returned error code {}: {}", code_num, msg),
+                        Some(status.as_u16()),
+                        Some(body),
+                    )));
+                }
+            }
+        }
+        
+        // 提取data字段或使用整个响应
+        let data = response_value.get("data").unwrap_or(&response_value);
+        
+        serde_json::from_value(data.clone()).map_err(ApiError::from)
+    }
+    
+    /// 发送流式聊天请求
+    pub async fn chat_stream(
+        &self,
+        request: crate::api::chat_models::ChatRequest,
+    ) -> Result<impl futures::Stream<Item = Result<crate::api::chat_models::StreamChatResponse, ApiError>>, ApiError> {
+        use crate::api::endpoints::chat::CHAT_V3_STREAM;
+        use futures::stream::StreamExt;
+        
+        let url = format!("{}{}", self.base_url, CHAT_V3_STREAM);
+        
+        let mut req = request;
+        req.stream = Some(true); // 确保流式
+        
+        let payload = serde_json::to_value(&req).map_err(ApiError::from)?;
+        
+        let request_builder = self.client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .header("Cache-Control", "no-cache")
+            .json(&payload);
+        
+        let response = request_builder.send().await?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await?;
+            return Err(ApiError::from_response(status, body));
+        }
+        
+        let stream = response.bytes_stream()
+            .map(|chunk_result| {
+                chunk_result
+                    .map_err(ApiError::from)
+                    .and_then(|chunk| {
+                        let text = String::from_utf8_lossy(&chunk);
+                        Self::parse_sse_chunk(&text)
+                    })
+            })
+            .filter_map(|result| async move {
+                match result {
+                    Ok(Some(response)) => Some(Ok(response)),
+                    Ok(None) => None, // 跳过空块或注释
+                    Err(e) => Some(Err(e)),
+                }
+            });
+        
+        Ok(stream)
+    }
+    
+    /// 解析SSE (Server-Sent Events) 数据块
+    fn parse_sse_chunk(text: &str) -> Result<Option<crate::api::chat_models::StreamChatResponse>, ApiError> {
+        for line in text.lines() {
+            let line = line.trim();
+            
+            // 跳过空行和注释
+            if line.is_empty() || line.starts_with(':') {
+                continue;
+            }
+            
+            // 解析data字段
+            if let Some(data) = line.strip_prefix("data: ") {
+                if data == "[DONE]" {
+                    return Ok(Some(crate::api::chat_models::StreamChatResponse {
+                        event: crate::api::chat_models::StreamEventType::Done,
+                        conversation_id: None,
+                        id: None,
+                        created_at: None,
+                        delta: None,
+                        usage: None,
+                        last_error: None,
+                    }));
+                }
+                
+                let parsed: serde_json::Value = serde_json::from_str(data)
+                    .map_err(ApiError::from)?;
+                
+                // 检查是否有业务错误
+                if let Some(code) = parsed.get("code") {
+                    if let Some(code_num) = code.as_i64() {
+                        if code_num != 0 {
+                            let msg = parsed.get("msg")
+                                .or_else(|| parsed.get("message"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown error");
+                            return Err(ApiError::BadRequest(ApiErrorData::new(
+                                "stream_error",
+                                format!("Stream returned error code {}: {}", code_num, msg),
+                                None,
+                                Some(data.to_string()),
+                            )));
+                        }
+                    }
+                }
+                
+                // 提取data字段或使用整个响应
+                let data_field = parsed.get("data").unwrap_or(&parsed);
+                
+                let response: crate::api::chat_models::StreamChatResponse = 
+                    serde_json::from_value(data_field.clone()).map_err(ApiError::from)?;
+                
+                return Ok(Some(response));
+            }
+        }
+        
+        Ok(None)
+    }
+
+    /// 使用类型化模型获取智能体列表
+    pub async fn list_bots_typed(
+        &self,
+        request: &crate::api::bot_models::ListBotsRequest,
+    ) -> Result<crate::api::bot_models::ListBotsResponse, ApiError> {
+        use crate::api::endpoints::bots::LIST_BOTS;
+        
+        let url = format!("{}{}?{}", self.base_url, LIST_BOTS, request.to_query_params());
+        
+        let response = self.send_raw_request("GET", &url, None).await?;
+        let text = response.text().await.map_err(ApiError::from)?;
+        
+        let parsed: serde_json::Value = serde_json::from_str(&text).map_err(ApiError::from)?;
+        
+        // 检查业务错误
+        if let Some(code) = parsed.get("code").and_then(|v| v.as_i64()) {
+            if code != 0 {
+                let msg = parsed.get("msg")
+                    .or_else(|| parsed.get("message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                return Err(ApiError::BadRequest(ApiErrorData::new(
+                    "list_bots",
+                    format!("API returned error code {}: {}", code, msg),
+                    None,
+                    Some(text),
+                )));
+            }
+        }
+        
+        // 解析响应
+        let response: crate::api::bot_models::ListBotsResponse = 
+            serde_json::from_str(&text).map_err(ApiError::from)?;
+        
+        Ok(response)
+    }
+
+    /// 获取对话详情
+    pub async fn get_chat_detail(
+        &self,
+        conversation_id: &str,
+        chat_id: &str,
+    ) -> Result<crate::api::chat_models::ChatResponse, ApiError> {
+        use crate::api::endpoints::chat::GET_CHAT_DETAIL;
+        
+        let url = format!("{}{}?conversation_id={}&chat_id={}", 
+            self.base_url, GET_CHAT_DETAIL, encode(conversation_id), encode(chat_id));
+        
+        let response = self.send_raw_request("GET", &url, None).await?;
+        let text = response.text().await.map_err(ApiError::from)?;
+        
+        let parsed: serde_json::Value = serde_json::from_str(&text).map_err(ApiError::from)?;
+        
+        // 检查业务错误
+        if let Some(code) = parsed.get("code").and_then(|v| v.as_i64()) {
+            if code != 0 {
+                let msg = parsed.get("msg")
+                    .or_else(|| parsed.get("message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                return Err(ApiError::BadRequest(ApiErrorData::new(
+                    "get_chat_detail",
+                    format!("API returned error code {}: {}", code, msg),
+                    None,
+                    Some(text),
+                )));
+            }
+        }
+        
+        // 提取data字段或使用整个响应
+        let data = parsed.get("data").unwrap_or(&parsed);
+        serde_json::from_value(data.clone()).map_err(ApiError::from)
+    }
+
+    /// 获取对话消息列表
+    pub async fn get_chat_messages(
+        &self,
+        conversation_id: &str,
+        chat_id: &str,
+    ) -> Result<Vec<crate::api::chat_models::ChatMessage>, ApiError> {
+        use crate::api::endpoints::chat::GET_CHAT_MESSAGES;
+        
+        let url = format!("{}{}?conversation_id={}&chat_id={}", 
+            self.base_url, GET_CHAT_MESSAGES, encode(conversation_id), encode(chat_id));
+        
+        let response = self.send_raw_request("GET", &url, None).await?;
+        let text = response.text().await.map_err(ApiError::from)?;
+        
+        let parsed: serde_json::Value = serde_json::from_str(&text).map_err(ApiError::from)?;
+        
+        // 检查业务错误
+        if let Some(code) = parsed.get("code").and_then(|v| v.as_i64()) {
+            if code != 0 {
+                let msg = parsed.get("msg")
+                    .or_else(|| parsed.get("message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                return Err(ApiError::BadRequest(ApiErrorData::new(
+                    "get_chat_messages",
+                    format!("API returned error code {}: {}", code, msg),
+                    None,
+                    Some(text),
+                )));
+            }
+        }
+        
+        // 提取messages字段
+        let empty_array = serde_json::Value::Array(vec![]);
+        let messages = parsed.get("data")
+            .and_then(|d| d.get("data"))
+            .or_else(|| parsed.get("data"))
+            .or_else(|| parsed.get("messages"))
+            .unwrap_or(&empty_array);
+            
+        serde_json::from_value(messages.clone()).map_err(ApiError::from)
     }
 
 }

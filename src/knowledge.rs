@@ -35,6 +35,59 @@ impl KnowledgeManager {
 
     // Upload document methods removed (deprecated)
 
+    /// 创建知识库 (使用标准 v1/datasets API)
+    /// 
+    /// 根据 Coze API 文档创建知识库，支持文本和图片类型
+    /// 
+    /// # 参数
+    /// - `name`: 知识库名称，长度不超过 100 个字符
+    /// - `space_id`: 知识库所在空间的唯一标识
+    /// - `format_type`: 知识库类型，0-文本类型，2-图片类型
+    /// - `description`: 知识库描述信息（可选）
+    /// - `file_id`: 知识库图标（可选），需传入【上传文件】API 返回的 file_id
+    pub async fn create_dataset(
+        &self,
+        name: &str,
+        space_id: &str,
+        format_type: i32,
+        description: Option<&str>,
+        file_id: Option<&str>,
+    ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
+        use crate::api::knowledge_models::CreateDatasetRequest;
+        
+        let request = CreateDatasetRequest {
+            name: name.to_string(),
+            space_id: space_id.to_string(),
+            format_type,
+            description: description.map(|d| d.to_string()),
+            file_id: file_id.map(|f| f.to_string()),
+        };
+        
+        self.client.create_dataset(request).await
+    }
+
+    /// 创建文本类型知识库
+    pub async fn create_text_dataset(
+        &self,
+        name: &str,
+        space_id: &str,
+        description: Option<&str>,
+        file_id: Option<&str>,
+    ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
+        self.create_dataset(name, space_id, 0, description, file_id).await
+    }
+
+    /// 创建图片类型知识库
+    pub async fn create_image_dataset(
+        &self,
+        name: &str,
+        space_id: &str,
+        description: Option<&str>,
+        file_id: Option<&str>,
+    ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
+        self.create_dataset(name, space_id, 2, description, file_id).await
+    }
+
     /// Create knowledge base with permission
     pub async fn create_knowledge_base_with_permission(
         &self,
@@ -43,19 +96,12 @@ impl KnowledgeManager {
         space_id: Option<&str>,
         permission: Option<i32>,
     ) -> Result<serde_json::Value, ApiError> {
-        let request = crate::api::endpoints::CreateKnowledgeRequest {
-            name: name.to_string(),
-            description: description.map(|d| d.to_string()),
-            space_id: space_id.map(|s| s.to_string()),
-            permission,
-        };
-
         self.client
             .create_knowledge_base_with_permission(
-                request.name,
-                request.description,
-                request.space_id,
-                request.permission,
+                name.to_string(),
+                description.map(|d| d.to_string()),
+                space_id.map(|s| s.to_string()),
+                permission,
             )
             .await
     }

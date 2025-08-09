@@ -1,12 +1,13 @@
 # Coze MCP Server
 
-一个基于 MCP（Model Context Protocol）的 Coze 中国区 API 适配服务器（CN-only，固定 <https://api.coze.cn>）。当前仅暴露只读类工具，写入类接口先通过集成探针验证后再考虑开放。
+一个基于 MCP（Model Context Protocol）的 Coze 中国区 API 适配服务器（CN-only，固定 <https://api.coze.cn>）。已精简为最小可用集合，现包含 9 个核心工具，**新增对话功能支持流式和非流式聊天**。
 
-## 功能特性（与当前实现一致）
+## 功能特性（增强版）
 
 - 中国区专用：固定使用 <https://api.coze.cn>，内置中国区响应包裹 { code, msg, data } 的兼容解析
-- 只读优先：对外仅开放“列表/详情/检索”等只读工具，避免误用未验证写入接口
-- 结构化输出：所有工具同时返回文本与 structured_content，便于上层消费
+- **对话功能**：支持非流式和流式聊天，实时与 Coze Bot 交互
+- 最小接口面：仅暴露少量稳定、高频、清晰的操作，降低维护成本
+- 结构化输出：所有工具返回文本 + structured_content
 - 传输方式：当前实现 stdio（适配 Claude Desktop 等 MCP 客户端）
 
 ## 安装
@@ -44,78 +45,23 @@ cargo build --release
 
 或仅设环境变量后直接启动可执行文件。
 
-## 可用工具（只读 + 配置类）
+## 可用工具（当前 9 个）
 
-当前已实现 **46个MCP工具**，覆盖以下功能模块：
+| 工具 | 说明 |
+|------|------|
+| set_api_key | 设置 / 更新 API Key |
+| list_workspaces | 列出工作空间 |
+| list_bots | 列出 Bots（支持分页） |
+| list_knowledge_bases | 列出知识库（支持名称过滤、分页、文档数量精确刷新） |
+| create_knowledge_base_v2 | 创建知识库（支持 permission=private/public） |
+| upload_document_to_knowledge_base | 上传本地文件到知识库（<=10MB 示例限制） |
+| list_conversations | 按 bot_id 列出会话 |
+| **chat** | **发送聊天消息（非流式）** |
+| **chat_stream** | **发送流式聊天消息** |
 
-### 配置管理 (3个工具)
-- `set_api_key`: 设置API密钥
-- `get_config_status`: 获取配置状态
-- `test_connection`: 测试API连接
+**新增聊天功能**：与 Coze Bot 实时对话，支持流式响应、对话历史管理、自定义变量等高级功能。
 
-### 知识库管理 (7个工具)
-- `list_knowledge_bases`: 按 space_id 列表
-- `get_knowledge_base`: 按 dataset_id 详情
-- `list_knowledge_base_ids`: 仅返回 {dataset_id, name}
-- `upload_document_to_knowledge_base`: 上传本地文档（支持PDF、DOCX等，最大10MB）
-- `upload_document_from_url`: 从URL上传文档（支持公开URL，最大100MB）
-- `create_knowledge_base_v2`: 创建知识库（v2 API，支持权限设置）
-- `find_dataset_id_by_name`: 通过名称查找知识库ID
-- `create_knowledge_base`: 创建知识库
-- `upload_document`: 上传文档到知识库
-
-**知识库文件上传功能**：支持PDF、DOCX、XLSX、PPTX、MD、TXT格式，单文件最大100MB。详见[知识库API指南](./KNOWLEDGE_BASE_API_GUIDE.md)。
-
-### 工作空间管理 (3个工具)
-- `list_workspaces`: 列出工作空间
-- `list_workspace_ids`: 仅返回 {workspace_id, name}
-
-### Bot管理 (4个工具)
-- `list_bots`: 列出Bots（workspace_id≈space_id）
-- `get_bot`: 获取Bot详情
-- `list_bot_ids`: 仅返回 {bot_id, name}
-
-### 工作流管理 (4个工具)
-- `list_workflows`: 列出工作流（workspace_id≈space_id）
-- `get_workflow`: 工作流详情
-- `list_workflow_ids`: 仅返回 {workflow_id, name}
-
-### 会话管理 (16个工具)
-- `list_conversations`: 需 bot_id；workspace_id≈space_id
-- `list_conversation_ids`: 需 bot_id
-- `count_conversations`: 需 bot_id
-- `retrieve_conversation`: 获取会话详情
-- `list_conversation_messages`: 本地分页
-- `retrieve_message_local`: 按 message_id 本地检索
-- `get_conversation_first_message`: 获取最早一条消息
-- `get_conversation_last_message`: 获取最新一条消息
-- `get_conversation_message_range`: 按区间索引获取消息，支持负索引
-- `export_conversation_markdown`: 导出会话为 Markdown
-- `get_conversation_overview`: 详情+最新消息
-- `search_conversations_by_title`: 本地筛选
-- `search_conversation_messages`: 本地检索 content
-- `count_conversation_messages`
-- `get_message_by_index`: 0=最旧，-1=最新
-
-### 数据导出 (7个工具)
-- `export_conversation_markdown`: 导出为Markdown
-- `export_conversation_json`: 导出为JSON
-- `export_conversation_csv`: 导出为CSV
-- `export_conversation_ndjson`: 导出为NDJSON
-- `export_conversation_pairs`: 导出为问答对
-- `export_conversation_html`: 导出为HTML
-- `export_conversation_text`: 导出为纯文本
-
-### 统计分析 (8个工具)
-- `get_conversation_duration`: 获取会话时长
-- `get_conversation_participants`: 获取参与者
-- `get_conversation_timeline`: 获取时间线
-- `get_conversation_stats`: 获取会话统计
-- `get_message_length_stats`: 获取消息长度统计
-
-提示：
-- list_conversations 在中国区必须提供 bot_id（schema 已强制）。
-- 工具返回同时包含 human_text 与 structured_content，字段更稳定，建议优先消费 structured_content。
+已移除的大量导出/统计/检索类工具，若后续需要再按需恢复。
 
 ## 开发
 
@@ -141,7 +87,7 @@ coze-mcp/
 │   ├── handlers/
 │   │   └── mod.rs          # 请求处理器
 │   ├── utils/              # 工具函数
-│   └── knowledge.rs        # 知识库管理器
+│   └── (knowledge.rs 已移除)
 ├── Cargo.toml
 └── README.md
 ```
@@ -175,11 +121,11 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 相关文档
 
-- [API参考](./API_REFERENCE.md) - 25个已实现API接口和10个精选MCP工具清单
+- [API参考](./API_REFERENCE.md) - 25个已实现API接口和精选MCP工具清单
 - [Coze API文档](./COZE_API_DOCUMENTATION.md) - 中国区API接口详细说明
 - [使用指南](./USAGE.md) - 安装配置和工具使用说明
-- [知识库实现](./KNOWLEDGE_BASE_IMPLEMENTATION.md) - 知识库功能架构设计
-- [开发计划](./DEVELOPMENT_PLAN.md) - 详细的开发路线图
+- **[聊天功能指南](./CHAT_USAGE_GUIDE.md) - 对话功能详细使用说明和示例**
+- (历史) 知识库实现、开发计划等文档与大批已移除工具对应内容已过期，将在需要时重新整理
 - [RMCP使用](./RMCP_USAGE_DOCUMENTATION.md) - RMCP服务器实现细节
 
 ## 相关链接

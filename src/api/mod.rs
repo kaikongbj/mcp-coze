@@ -2,6 +2,8 @@ pub mod client;
 pub mod endpoints;
 pub mod error;
 pub mod knowledge_models;
+pub mod chat_models;
+pub mod bot_models;
 
 pub use client::CozeApiClient;
 // pub use knowledge_models::*; // 注释掉未使用的导入
@@ -9,12 +11,6 @@ pub use client::CozeApiClient;
 // ---- Coze API typed models used by knowledge layer ----
 // search-related types removed (CN does not support knowledge search API)
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CreateKnowledgeBaseResponse {
-    pub dataset_id: String,
-    pub name: String,
-    pub description: String,
-}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KnowledgeBaseInfo {
@@ -114,8 +110,4 @@ impl ListDatasetsApiResponse {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct UploadDocumentResponse {
-    pub document_id: String,
-    pub status: String,
-}
+// Removed unused CreateKnowledgeBaseResponse / UploadDocumentResponse to reduce warnings.
