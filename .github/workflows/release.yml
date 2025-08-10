@@ -165,29 +165,22 @@ jobs:
       shell: bash
       run: |
         VERSION=${{ steps.version.outputs.version }}
-        echo "## Changes in v$VERSION" > RELEASE_NOTES.md
-        echo "" >> RELEASE_NOTES.md
-        echo "### Features" >> RELEASE_NOTES.md
-        echo "- Built with Rust stable toolchain" >> RELEASE_NOTES.md
-        echo "- Cross-platform support (Linux, Windows, macOS)" >> RELEASE_NOTES.md
-        echo "" >> RELEASE_NOTES.md
-        echo "### Supported Platforms" >> RELEASE_NOTES.md
-        echo "- Linux x86_64" >> RELEASE_NOTES.md
-        echo "- Windows x86_64" >> RELEASE_NOTES.md
-        echo "- macOS x86_64" >> RELEASE_NOTES.md
-        echo "- macOS ARM64" >> RELEASE_NOTES.md
-
-    - name: Create Release (for workflow_dispatch)
-      if: github.event_name == 'workflow_dispatch'
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.version.outputs.tag }}
-        release_name: Release ${{ steps.version.outputs.tag }}
-        body_path: RELEASE_NOTES.md
-        draft: false
-        prerelease: false
+        # 检查是否存在自定义的 RELEASE_NOTES.md
+        if [ -f "RELEASE_NOTES.md" ]; then
+          echo "Using existing RELEASE_NOTES.md"
+        else
+          echo "## Changes in v$VERSION" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Features" >> RELEASE_NOTES.md
+          echo "- Built with Rust stable toolchain" >> RELEASE_NOTES.md
+          echo "- Cross-platform support (Linux, Windows, macOS)" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Supported Platforms" >> RELEASE_NOTES.md
+          echo "- Linux x86_64" >> RELEASE_NOTES.md
+          echo "- Windows x86_64" >> RELEASE_NOTES.md
+          echo "- macOS x86_64" >> RELEASE_NOTES.md
+          echo "- macOS ARM64" >> RELEASE_NOTES.md
+        fi
 
     - name: Create or Update Release
       uses: softprops/action-gh-release@v1
@@ -200,3 +193,5 @@ jobs:
         draft: false
         prerelease: false
         token: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
