@@ -63,11 +63,7 @@ impl ServerHandler for CozeServer {
         let result: Result<CallToolResult, McpError> = match &tool_name[..] {
             "list_bots" => self.tools.list_bots(args_value.clone()).await,
             "list_knowledge_bases" => self.tools.list_knowledge_bases(args_value.clone()).await,
-            "create_dataset" => {
-                self.tools
-                    .create_dataset(args_value.clone())
-                    .await
-            }
+            "create_dataset" => self.tools.create_dataset(args_value.clone()).await,
             "upload_document_to_knowledge_base" => {
                 self.tools
                     .upload_document_to_knowledge_base(args_value.clone())
@@ -346,7 +342,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 使用 IO 传输特性：当前 rmcp crate 使用 transport-io 特征，提供 default io 传输构建器
     // 使用 rmcp 提供的 stdio 传输实现（transport-io 特性）
-    let running_service =   serve_server(server, rmcp::transport::stdio()).await?;
+    let running_service = serve_server(server, rmcp::transport::stdio()).await?;
     running_service.waiting().await?;
     Ok(())
 }

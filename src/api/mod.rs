@@ -1,9 +1,9 @@
+pub mod bot_models;
+pub mod chat_models;
 pub mod client;
 pub mod endpoints;
 pub mod error;
 pub mod knowledge_models;
-pub mod chat_models;
-pub mod bot_models;
 
 pub use client::CozeApiClient;
 // pub use knowledge_models::*; // 注释掉未使用的导入
@@ -12,7 +12,9 @@ pub use client::CozeApiClient;
 // search-related types removed (CN does not support knowledge search API)
 
 // Custom deserializer for u64 from string or number
-fn deserialize_optional_u64_from_string_or_number<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+fn deserialize_optional_u64_from_string_or_number<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -117,7 +119,12 @@ pub struct KnowledgeBaseInfo {
     pub creator_name: Option<String>,
     #[serde(rename = "hit_count", skip_serializing_if = "Option::is_none")]
     pub hit_count: Option<usize>,
-    #[serde(rename = "all_file_size", skip_serializing_if = "Option::is_none", default, deserialize_with = "deserialize_optional_u64_from_string_or_number")]
+    #[serde(
+        rename = "all_file_size",
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_optional_u64_from_string_or_number"
+    )]
     pub all_file_size: Option<u64>,
     #[serde(rename = "bot_used_count", skip_serializing_if = "Option::is_none")]
     pub bot_used_count: Option<usize>,
@@ -125,9 +132,15 @@ pub struct KnowledgeBaseInfo {
     pub file_list: Option<Vec<String>>,
     #[serde(rename = "failed_file_list", skip_serializing_if = "Option::is_none")]
     pub failed_file_list: Option<Vec<String>>,
-    #[serde(rename = "processing_file_list", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "processing_file_list",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub processing_file_list: Option<Vec<String>>,
-    #[serde(rename = "processing_file_id_list", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "processing_file_id_list",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub processing_file_id_list: Option<Vec<String>>,
     #[serde(rename = "chunk_strategy", skip_serializing_if = "Option::is_none")]
     pub chunk_strategy: Option<serde_json::Value>,
@@ -175,7 +188,10 @@ impl ListDatasetsApiResponse {
                 total: d.total_count,
             }
         } else {
-            ListKnowledgeBasesResponse { datasets: vec![], total: 0 }
+            ListKnowledgeBasesResponse {
+                datasets: vec![],
+                total: 0,
+            }
         }
     }
 }

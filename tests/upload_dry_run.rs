@@ -1,15 +1,27 @@
-use std::sync::Arc;
-use serde_json::json;
 use coze_mcp_server::api::client::CozeApiClient;
 use coze_mcp_server::api::error::ApiError;
+use serde_json::json;
+use std::sync::Arc;
 // CozeTools not publicly exported; test focuses on request shape via model instead.
-use coze_mcp_server::api::knowledge_models::{KnowledgeDocumentUploadRequestCn, DocumentBaseCn, SourceInfo, ChunkStrategyCn};
+use coze_mcp_server::api::knowledge_models::{
+    ChunkStrategyCn, DocumentBaseCn, KnowledgeDocumentUploadRequestCn, SourceInfo,
+};
 
 #[test]
 fn dry_run_request_shape_basic() -> Result<(), ApiError> {
-    let doc = DocumentBaseCn { name: "abc.txt".into(), source_info: SourceInfo::file_base64("QUJD".into(), "txt".into()), caption: None, update_rule: None };
+    let doc = DocumentBaseCn {
+        name: "abc.txt".into(),
+        source_info: SourceInfo::file_base64("QUJD".into(), "txt".into()),
+        caption: None,
+        update_rule: None,
+    };
     let chunk = ChunkStrategyCn::text("\n\n".into(), 800, 1);
-    let req = KnowledgeDocumentUploadRequestCn { dataset_id: "dataset123".into(), document_bases: vec![doc], chunk_strategy: chunk, format_type: 0 };
+    let req = KnowledgeDocumentUploadRequestCn {
+        dataset_id: "dataset123".into(),
+        document_bases: vec![doc],
+        chunk_strategy: chunk,
+        format_type: 0,
+    };
     let v = serde_json::to_value(&req).unwrap();
     assert_eq!(v.get("dataset_id").unwrap().as_str().unwrap(), "dataset123");
     let db = v.get("document_bases").unwrap().as_array().unwrap();

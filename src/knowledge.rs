@@ -36,9 +36,9 @@ impl KnowledgeManager {
     // Upload document methods removed (deprecated)
 
     /// 创建知识库 (使用标准 v1/datasets API)
-    /// 
+    ///
     /// 根据 Coze API 文档创建知识库，支持文本和图片类型
-    /// 
+    ///
     /// # 参数
     /// - `name`: 知识库名称，长度不超过 100 个字符
     /// - `space_id`: 知识库所在空间的唯一标识
@@ -54,7 +54,7 @@ impl KnowledgeManager {
         file_id: Option<&str>,
     ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
         use crate::api::knowledge_models::CreateDatasetRequest;
-        
+
         let request = CreateDatasetRequest {
             name: name.to_string(),
             space_id: space_id.to_string(),
@@ -62,7 +62,7 @@ impl KnowledgeManager {
             description: description.map(|d| d.to_string()),
             file_id: file_id.map(|f| f.to_string()),
         };
-        
+
         self.client.create_dataset(request).await
     }
 
@@ -74,7 +74,8 @@ impl KnowledgeManager {
         description: Option<&str>,
         file_id: Option<&str>,
     ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
-        self.create_dataset(name, space_id, 0, description, file_id).await
+        self.create_dataset(name, space_id, 0, description, file_id)
+            .await
     }
 
     /// 创建图片类型知识库
@@ -85,7 +86,8 @@ impl KnowledgeManager {
         description: Option<&str>,
         file_id: Option<&str>,
     ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
-        self.create_dataset(name, space_id, 2, description, file_id).await
+        self.create_dataset(name, space_id, 2, description, file_id)
+            .await
     }
 
     /// Create knowledge base with permission
@@ -106,7 +108,6 @@ impl KnowledgeManager {
             .await
     }
 
-
     /// Get current configuration
     pub fn get_config(&self) -> &KnowledgeConfig {
         &self.config
@@ -125,12 +126,13 @@ mod tests {
         let config = KnowledgeConfig::default();
         assert_eq!(config.chunk_size, 800);
         assert_eq!(config.chunk_overlap, 100);
-    // max_file_size assertion removed
+        // max_file_size assertion removed
     }
 
     #[test]
     fn test_knowledge_manager_creation() {
-    let client = CozeApiClient::new("http://localhost".to_string(), "test-token".to_string()).unwrap();
+        let client =
+            CozeApiClient::new("http://localhost".to_string(), "test-token".to_string()).unwrap();
         let config = KnowledgeConfig::default();
         let manager = KnowledgeManager::new(client, config);
         assert_eq!(manager.get_config().chunk_size, 800);

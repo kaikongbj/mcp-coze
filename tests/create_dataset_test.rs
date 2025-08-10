@@ -3,9 +3,9 @@
 mod tests {
     use coze_mcp_server::api::client::CozeApiClient;
     use coze_mcp_server::api::knowledge_models::{CreateDatasetRequest, CreateDatasetResponse};
+    use coze_mcp_server::tools::coze_tools::CozeTools;
     use serde_json::json;
     use std::sync::Arc;
-    use coze_mcp_server::tools::coze_tools::CozeTools;
 
     #[test]
     fn test_create_dataset_request_validation() {
@@ -15,11 +15,14 @@ mod tests {
             "123456789".to_string(),
             Some("这是一个测试文本知识库".to_string()),
         );
-        
+
         assert_eq!(text_request.name, "测试文本知识库");
         assert_eq!(text_request.space_id, "123456789");
         assert_eq!(text_request.format_type, 0); // 文本类型
-        assert_eq!(text_request.description, Some("这是一个测试文本知识库".to_string()));
+        assert_eq!(
+            text_request.description,
+            Some("这是一个测试文本知识库".to_string())
+        );
         assert_eq!(text_request.file_id, None);
 
         // 测试图片类型知识库请求
@@ -27,8 +30,9 @@ mod tests {
             "测试图片知识库".to_string(),
             "987654321".to_string(),
             None,
-        ).with_icon("file_123".to_string());
-        
+        )
+        .with_icon("file_123".to_string());
+
         assert_eq!(image_request.name, "测试图片知识库");
         assert_eq!(image_request.space_id, "987654321");
         assert_eq!(image_request.format_type, 2); // 图片类型
@@ -56,7 +60,10 @@ mod tests {
         assert!(response.data.is_some());
         assert_eq!(response.data.unwrap().dataset_id, "744668935865830123");
         assert!(response.detail.is_some());
-        assert_eq!(response.detail.unwrap().logid, "20241210160547B25AEC1917B03A2F1F07");
+        assert_eq!(
+            response.detail.unwrap().logid,
+            "20241210160547B25AEC1917B03A2F1F07"
+        );
 
         // 测试错误响应解析
         let error_json = json!({
@@ -73,16 +80,18 @@ mod tests {
         assert_eq!(error_response.msg, "参数错误");
         assert!(error_response.data.is_none());
         assert!(error_response.detail.is_some());
-        assert_eq!(error_response.detail.unwrap().logid, "20241210160547B25AEC1917B03A2F1F08");
+        assert_eq!(
+            error_response.detail.unwrap().logid,
+            "20241210160547B25AEC1917B03A2F1F08"
+        );
     }
 
     #[tokio::test]
     async fn test_create_dataset_tool_validation() {
         // 创建测试用的 CozeTools 实例
-        let client = CozeApiClient::new(
-            "https://api.coze.cn".to_string(),
-            "test-token".to_string(),
-        ).unwrap();
+        let client =
+            CozeApiClient::new("https://api.coze.cn".to_string(), "test-token".to_string())
+                .unwrap();
         let tools = CozeTools::new(Arc::new(client), "test_space_id".to_string());
 
         // 测试缺少必需参数
@@ -122,7 +131,7 @@ mod tests {
         });
         let result = tools.create_dataset(Some(valid_args)).await;
         assert!(result.is_ok()); // 工具调用本身成功，但API调用可能失败
-        // 注意：这里不检查 is_error，因为网络调用会失败
+                                 // 注意：这里不检查 is_error，因为网络调用会失败
     }
 
     #[test]
@@ -130,7 +139,7 @@ mod tests {
         // 测试支持的 format_type 值
         assert_eq!(0, 0); // 文本类型
         assert_eq!(2, 2); // 图片类型
-        
+
         // 验证不支持的值
         let unsupported_types = vec![1, 3, 4, -1];
         for unsupported in unsupported_types {

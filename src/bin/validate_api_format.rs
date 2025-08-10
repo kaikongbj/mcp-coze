@@ -1,8 +1,8 @@
-use coze_mcp_server::api::{ListKnowledgeBasesResponse, KnowledgeBaseInfo};
+use coze_mcp_server::api::{KnowledgeBaseInfo, ListKnowledgeBasesResponse};
 
 fn main() {
     println!("🔍 验证API数据格式兼容性...");
-    
+
     // 模拟API响应数据
     let mock_response = r#"{
         "data": {
@@ -31,7 +31,7 @@ fn main() {
             "total_count": 1
         }
     }"#;
-    
+
     let mock_response_v2 = r#"{
         "datasets": [
             {
@@ -55,14 +55,16 @@ fn main() {
         ],
         "total": 1
     }"#;
-    
+
     // 测试格式1：嵌套data结构
     println!("📋 测试格式1：嵌套data结构");
     let response: Result<serde_json::Value, _> = serde_json::from_str(mock_response);
     match response {
         Ok(data) => {
             if let Some(dataset_list) = data.get("data").and_then(|d| d.get("datasets")) {
-                if let Ok(datasets) = serde_json::from_value::<Vec<KnowledgeBaseInfo>>(dataset_list.clone()) {
+                if let Ok(datasets) =
+                    serde_json::from_value::<Vec<KnowledgeBaseInfo>>(dataset_list.clone())
+                {
                     println!("   ✅ 格式1解析成功！数据集数量: {}", datasets.len());
                     if let Some(dataset) = datasets.first() {
                         println!("      数据集ID: {}", dataset.dataset_id);
@@ -76,7 +78,7 @@ fn main() {
         }
         Err(e) => println!("   ❌ 格式1JSON解析失败: {e}"),
     }
-    
+
     // 测试格式2：直接datasets结构
     println!("📋 测试格式2：直接datasets结构");
     let response_v2: Result<ListKnowledgeBasesResponse, _> = serde_json::from_str(mock_response_v2);
@@ -85,7 +87,7 @@ fn main() {
             println!("   ✅ 格式2解析成功！");
             println!("   总数量: {}", data.total);
             println!("   数据集数量: {}", data.datasets.len());
-            
+
             if let Some(dataset) = data.datasets.first() {
                 println!("   第一个数据集:");
                 println!("     ID: {}", dataset.dataset_id);
@@ -93,19 +95,19 @@ fn main() {
                 println!("     描述: {}", dataset.description);
                 println!("     文档数量: {}", dataset.document_count);
                 println!("     创建时间: {}", dataset.created_at);
-                
+
                 // 验证所有必需字段
                 assert!(!dataset.dataset_id.is_empty());
                 assert!(!dataset.name.is_empty());
                 // document_count is usize; non-negative by definition
                 assert!(dataset.created_at > 0);
-                
+
                 println!("   ✅ 所有必需字段验证通过！");
             }
         }
         Err(e) => println!("   ❌ 格式2解析失败: {e}"),
     }
-    
+
     // 测试字段映射
     println!("📋 测试字段映射:");
     let test_json = r#"{
@@ -115,7 +117,7 @@ fn main() {
         "create_time": 1234567890,
         "doc_count": 42
     }"#;
-    
+
     let test_result: Result<KnowledgeBaseInfo, _> = serde_json::from_str(test_json);
     match test_result {
         Ok(info) => {
@@ -128,6 +130,6 @@ fn main() {
         }
         Err(e) => println!("   ❌ 字段映射验证失败: {e}"),
     }
-    
+
     println!("🎉 所有API格式验证完成！");
 }

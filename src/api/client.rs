@@ -1,6 +1,4 @@
-use crate::api::endpoints::{
-    KNOWLEDGE_DOCUMENT_CREATE_URL,
-};
+use crate::api::endpoints::KNOWLEDGE_DOCUMENT_CREATE_URL;
 use crate::api::error::{ApiError, ApiErrorData};
 // Chat completion models removed (unused)
 use reqwest::{Client, Response};
@@ -19,7 +17,14 @@ impl CozeApiClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .map_err(|e| ApiError::ConfigError(ApiErrorData::new("config", format!("Failed to build HTTP client: {e}"), None, None)))?;
+            .map_err(|e| {
+                ApiError::ConfigError(ApiErrorData::new(
+                    "config",
+                    format!("Failed to build HTTP client: {e}"),
+                    None,
+                    None,
+                ))
+            })?;
 
         Ok(Self {
             client,
@@ -35,7 +40,8 @@ impl CozeApiClient {
         url: &str,
         body: Option<serde_json::Value>,
     ) -> Result<Response, ApiError> {
-        let request = self.client
+        let request = self
+            .client
             .request(method.parse().unwrap(), url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -71,7 +77,7 @@ impl CozeApiClient {
         req: crate::models::CozeApiRequest,
     ) -> Result<crate::models::CozeApiResponse, ApiError> {
         use crate::models::HttpMethod;
-        
+
         let method_str = match req.method {
             HttpMethod::Get => "GET",
             HttpMethod::Post => "POST",
@@ -81,17 +87,22 @@ impl CozeApiClient {
         };
 
         let mut url = format!("{}{}", self.base_url, req.endpoint);
-        
+
         // Add query parameters for GET requests
         if !req.params.is_empty() && matches!(req.method, HttpMethod::Get) {
-            let params: Vec<String> = req.params
+            let params: Vec<String> = req
+                .params
                 .iter()
                 .map(|(k, v)| {
                     let value_str = match v {
                         serde_json::Value::String(s) => s.clone(),
                         _ => v.to_string().trim_matches('"').to_string(),
                     };
-                    format!("{}={}", urlencoding::encode(k), urlencoding::encode(&value_str))
+                    format!(
+                        "{}={}",
+                        urlencoding::encode(k),
+                        urlencoding::encode(&value_str)
+                    )
                 })
                 .collect();
             if !params.is_empty() {
@@ -102,14 +113,15 @@ impl CozeApiClient {
 
         let response = self.send_raw_request(method_str, &url, req.body).await?;
         let status_code = response.status().as_u16();
-        let headers = response.headers()
+        let headers = response
+            .headers()
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
             .collect();
-        
+
         let body_text = response.text().await?;
-        let body: serde_json::Value = serde_json::from_str(&body_text)
-            .unwrap_or(serde_json::Value::String(body_text));
+        let body: serde_json::Value =
+            serde_json::from_str(&body_text).unwrap_or(serde_json::Value::String(body_text));
 
         Ok(crate::models::CozeApiResponse {
             status_code,
@@ -130,10 +142,10 @@ impl CozeApiClient {
         _permission: Option<i32>, // Note: permission parameter not used in current API
     ) -> Result<serde_json::Value, ApiError> {
         use crate::api::knowledge_models::CreateDatasetRequest;
-        
+
         // Default space_id if not provided (this should be configured properly)
         let space_id = space_id.unwrap_or_else(|| "default_space".to_string());
-        
+
         let request = CreateDatasetRequest {
             name,
             space_id,
@@ -141,9 +153,9 @@ impl CozeApiClient {
             description,
             file_id: None,
         };
-        
+
         let response = self.create_dataset(request).await?;
-        
+
         // Convert to generic JSON value for compatibility
         serde_json::to_value(response).map_err(ApiError::from)
     }
@@ -157,8 +169,8 @@ impl CozeApiClient {
         req: crate::api::knowledge_models::KnowledgeDocumentUploadRequestCn,
     ) -> Result<crate::api::knowledge_models::KnowledgeDocumentUploadResponseCn, ApiError> {
         let url = format!("{}{}", self.base_url, KNOWLEDGE_DOCUMENT_CREATE_URL);
-    let sanitized = req.sanitized();
-    let payload = serde_json::to_value(&sanitized).map_err(ApiError::from)?;
+        let sanitized = req.sanitized();
+        let payload = serde_json::to_value(&sanitized).map_err(ApiError::from)?;
         println!("Upload payload: {payload:?}");
         let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
         println!("Upload response: {resp:?}");
@@ -170,7 +182,12 @@ impl CozeApiClient {
     // ---- Additional API helpers required by tools ----
     pub async fn get_dataset_cn(&self, dataset_id: &str) -> Result<serde_json::Value, ApiError> {
         use crate::api::endpoints::datasets_cn::GET_KNOWLEDGE_BASE;
-        let url = format!("{}{}?dataset_id={}", self.base_url, GET_KNOWLEDGE_BASE, encode(dataset_id));
+        let url = format!(
+            "{}{}?dataset_id={}",
+            self.base_url,
+            GET_KNOWLEDGE_BASE,
+            encode(dataset_id)
+        );
         let resp = self.send_raw_request("GET", &url, None).await?;
         self.process_response(resp).await
     }
@@ -185,10 +202,21 @@ impl CozeApiClient {
         page_size: Option<u32>,
     ) -> Result<serde_json::Value, ApiError> {
         use crate::api::endpoints::conversation::LIST_CONVERSATIONS;
-        let mut url = format!("{}{}?bot_id={}", self.base_url, LIST_CONVERSATIONS, encode(bot_id));
-        if let Some(ws) = workspace_id { url.push_str(&format!("&workspace_id={}", encode(ws))); }
-        if let Some(p) = page { url.push_str(&format!("&page={p}")); }
-        if let Some(ps) = page_size { url.push_str(&format!("&page_size={ps}")); }
+        let mut url = format!(
+            "{}{}?bot_id={}",
+            self.base_url,
+            LIST_CONVERSATIONS,
+            encode(bot_id)
+        );
+        if let Some(ws) = workspace_id {
+            url.push_str(&format!("&workspace_id={}", encode(ws)));
+        }
+        if let Some(p) = page {
+            url.push_str(&format!("&page={p}"));
+        }
+        if let Some(ps) = page_size {
+            url.push_str(&format!("&page_size={ps}"));
+        }
         let resp = self.send_raw_request("GET", &url, None).await?;
         self.process_response(resp).await
     }
@@ -200,10 +228,10 @@ impl CozeApiClient {
     ) -> Result<crate::api::knowledge_models::CreateDatasetResponse, ApiError> {
         use crate::api::endpoints::datasets_v1::CREATE_DATASETS;
         let url = format!("{}{}", self.base_url, CREATE_DATASETS);
-        
+
         // 将请求转换为 JSON 格式
         let payload = serde_json::to_value(&request).map_err(ApiError::from)?;
-        
+
         let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
         self.process_response(resp).await
     }
@@ -219,17 +247,52 @@ impl CozeApiClient {
     ) -> Result<crate::api::ListKnowledgeBasesResponse, ApiError> {
         use crate::api::endpoints::datasets_v1::LIST_DATASETS;
         // Basic validation according to doc: page_num >=1, page_size 1..=300
-    if let Some(pn) = page_num { if pn == 0 { return Err(ApiError::BadRequest(ApiErrorData::new("bad_request", "page_num must be >= 1".to_string(), None, None))); } }
-    if let Some(ps) = page_size { if ps == 0 || ps > 300 { return Err(ApiError::BadRequest(ApiErrorData::new("bad_request", "page_size must be in 1..=300".to_string(), None, None))); } }
-        let mut url = format!("{}{}?space_id={}", self.base_url, LIST_DATASETS, encode(space_id));
-        if let Some(n) = name { if !n.is_empty() { url.push_str(&format!("&name={}", encode(n))); } }
-        if let Some(f) = format_type { url.push_str(&format!("&format_type={f}")); }
-        if let Some(pn) = page_num { url.push_str(&format!("&page_num={pn}")); }
-        if let Some(ps) = page_size { url.push_str(&format!("&page_size={ps}")); }
+        if let Some(pn) = page_num {
+            if pn == 0 {
+                return Err(ApiError::BadRequest(ApiErrorData::new(
+                    "bad_request",
+                    "page_num must be >= 1".to_string(),
+                    None,
+                    None,
+                )));
+            }
+        }
+        if let Some(ps) = page_size {
+            if ps == 0 || ps > 300 {
+                return Err(ApiError::BadRequest(ApiErrorData::new(
+                    "bad_request",
+                    "page_size must be in 1..=300".to_string(),
+                    None,
+                    None,
+                )));
+            }
+        }
+        let mut url = format!(
+            "{}{}?space_id={}",
+            self.base_url,
+            LIST_DATASETS,
+            encode(space_id)
+        );
+        if let Some(n) = name {
+            if !n.is_empty() {
+                url.push_str(&format!("&name={}", encode(n)));
+            }
+        }
+        if let Some(f) = format_type {
+            url.push_str(&format!("&format_type={f}"));
+        }
+        if let Some(pn) = page_num {
+            url.push_str(&format!("&page_num={pn}"));
+        }
+        if let Some(ps) = page_size {
+            url.push_str(&format!("&page_size={ps}"));
+        }
         let resp = self.send_raw_request("GET", &url, None).await?;
         let raw_text_status = resp.status();
         let text = resp.text().await?;
-        if !raw_text_status.is_success() { return Err(ApiError::from_response(raw_text_status, text)); }
+        if !raw_text_status.is_success() {
+            return Err(ApiError::from_response(raw_text_status, text));
+        }
         // Try direct deserialize first
         let parsed: Result<crate::api::ListDatasetsApiResponse, _> = serde_json::from_str(&text);
         if let Ok(r) = parsed {
@@ -238,51 +301,152 @@ impl CozeApiClient {
         // Fallback: tolerant mapping similar to CN version
         let raw: serde_json::Value = serde_json::from_str(&text).map_err(ApiError::from)?;
         let data = raw.get("data").unwrap_or(&raw);
-        let list = data.get("dataset_list").or_else(|| data.get("datasets")).cloned().unwrap_or(serde_json::Value::Null);
-        let total = data.get("total_count").or_else(|| data.get("total")).and_then(|v| v.as_u64()).unwrap_or_else(|| list.as_array().map(|a| a.len() as u64).unwrap_or(0)) as usize;
+        let list = data
+            .get("dataset_list")
+            .or_else(|| data.get("datasets"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        let total = data
+            .get("total_count")
+            .or_else(|| data.get("total"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or_else(|| list.as_array().map(|a| a.len() as u64).unwrap_or(0))
+            as usize;
         let mut datasets: Vec<crate::api::KnowledgeBaseInfo> = Vec::new();
-        if let Some(arr) = list.as_array() { for item in arr { if let Some(obj) = item.as_object() {
-            let dataset_id = obj.get("dataset_id").or_else(|| obj.get("id")).and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let name_v = obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let description = obj.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let created_at = obj.get("create_time").or_else(|| obj.get("created_at")).and_then(|v| v.as_i64()).unwrap_or(0);
-            let doc_count = obj.get("doc_count").or_else(|| obj.get("document_count")).and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-            datasets.push(crate::api::KnowledgeBaseInfo {
-                dataset_id,
-                name: name_v,
-                description,
-                created_at,
-                document_count: doc_count,
-                update_time: obj.get("update_time").and_then(|v| v.as_i64()),
-                status: obj.get("status").and_then(|v| v.as_i64()).map(|v| v as i32),
-                format_type: obj.get("format_type").and_then(|v| v.as_i64()).map(|v| v as i32),
-                slice_count: obj.get("slice_count").and_then(|v| v.as_u64()).map(|v| v as usize),
-                space_id: obj.get("space_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                dataset_type: obj.get("dataset_type").and_then(|v| v.as_i64()).map(|v| v as i32),
-                can_edit: obj.get("can_edit").and_then(|v| v.as_bool()),
-                icon_url: obj.get("icon_url").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                icon_uri: obj.get("icon_uri").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                avatar_url: obj.get("avatar_url").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                creator_id: obj.get("creator_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                creator_name: obj.get("creator_name").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                hit_count: obj.get("hit_count").and_then(|v| v.as_u64()).map(|v| v as usize),
-                all_file_size: obj.get("all_file_size").and_then(|v| if v.is_u64() { v.as_u64() } else { v.as_str().and_then(|s| s.parse::<u64>().ok()) }),
-                bot_used_count: obj.get("bot_used_count").and_then(|v| v.as_u64()).map(|v| v as usize),
-                file_list: obj.get("file_list").and_then(|v| v.as_array()).map(|arr| arr.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect()),
-                failed_file_list: obj.get("failed_file_list").and_then(|v| v.as_array()).map(|arr| arr.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect()),
-                processing_file_list: obj.get("processing_file_list").and_then(|v| v.as_array()).map(|arr| arr.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect()),
-                processing_file_id_list: obj.get("processing_file_id_list").and_then(|v| v.as_array()).map(|arr| arr.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect()),
-                chunk_strategy: obj.get("chunk_strategy").cloned(),
-                storage_config: obj.get("storage_config").cloned(),
-                project_id: obj.get("project_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                raw_extra: None,
-            }); } }
+        if let Some(arr) = list.as_array() {
+            for item in arr {
+                if let Some(obj) = item.as_object() {
+                    let dataset_id = obj
+                        .get("dataset_id")
+                        .or_else(|| obj.get("id"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let name_v = obj
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let description = obj
+                        .get("description")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let created_at = obj
+                        .get("create_time")
+                        .or_else(|| obj.get("created_at"))
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0);
+                    let doc_count = obj
+                        .get("doc_count")
+                        .or_else(|| obj.get("document_count"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as usize;
+                    datasets.push(crate::api::KnowledgeBaseInfo {
+                        dataset_id,
+                        name: name_v,
+                        description,
+                        created_at,
+                        document_count: doc_count,
+                        update_time: obj.get("update_time").and_then(|v| v.as_i64()),
+                        status: obj.get("status").and_then(|v| v.as_i64()).map(|v| v as i32),
+                        format_type: obj
+                            .get("format_type")
+                            .and_then(|v| v.as_i64())
+                            .map(|v| v as i32),
+                        slice_count: obj
+                            .get("slice_count")
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as usize),
+                        space_id: obj
+                            .get("space_id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        dataset_type: obj
+                            .get("dataset_type")
+                            .and_then(|v| v.as_i64())
+                            .map(|v| v as i32),
+                        can_edit: obj.get("can_edit").and_then(|v| v.as_bool()),
+                        icon_url: obj
+                            .get("icon_url")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        icon_uri: obj
+                            .get("icon_uri")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        avatar_url: obj
+                            .get("avatar_url")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        creator_id: obj
+                            .get("creator_id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        creator_name: obj
+                            .get("creator_name")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        hit_count: obj
+                            .get("hit_count")
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as usize),
+                        all_file_size: obj.get("all_file_size").and_then(|v| {
+                            if v.is_u64() {
+                                v.as_u64()
+                            } else {
+                                v.as_str().and_then(|s| s.parse::<u64>().ok())
+                            }
+                        }),
+                        bot_used_count: obj
+                            .get("bot_used_count")
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as usize),
+                        file_list: obj.get("file_list").and_then(|v| v.as_array()).map(|arr| {
+                            arr.iter()
+                                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                                .collect()
+                        }),
+                        failed_file_list: obj
+                            .get("failed_file_list")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                                    .collect()
+                            }),
+                        processing_file_list: obj
+                            .get("processing_file_list")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                                    .collect()
+                            }),
+                        processing_file_id_list: obj
+                            .get("processing_file_id_list")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                                    .collect()
+                            }),
+                        chunk_strategy: obj.get("chunk_strategy").cloned(),
+                        storage_config: obj.get("storage_config").cloned(),
+                        project_id: obj
+                            .get("project_id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        raw_extra: None,
+                    });
+                }
+            }
         }
         Ok(crate::api::ListKnowledgeBasesResponse { datasets, total })
     }
 
     // ---- Chat API methods ----
-    
+
     /// 发送聊天请求（非流式）
     pub async fn chat(
         &self,
@@ -290,30 +454,31 @@ impl CozeApiClient {
     ) -> Result<crate::api::chat_models::ChatResponse, ApiError> {
         use crate::api::endpoints::chat::CHAT_V3;
         let url = format!("{}{}", self.base_url, CHAT_V3);
-        
+
         let mut req = request;
         req.stream = Some(false); // 确保非流式
-        
+
         let payload = serde_json::to_value(&req).map_err(ApiError::from)?;
         let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
-        
+
         // 解析响应
         let status = resp.status();
         let body = resp.text().await?;
-        
+
         if !status.is_success() {
             return Err(ApiError::from_response(status, body));
         }
-        
+
         // 尝试解析为标准响应格式
-        let response_value: serde_json::Value = serde_json::from_str(&body)
-            .map_err(ApiError::from)?;
-        
+        let response_value: serde_json::Value =
+            serde_json::from_str(&body).map_err(ApiError::from)?;
+
         // 检查是否有业务错误
         if let Some(code) = response_value.get("code") {
             if let Some(code_num) = code.as_i64() {
                 if code_num != 0 {
-                    let msg = response_value.get("msg")
+                    let msg = response_value
+                        .get("msg")
                         .or_else(|| response_value.get("message"))
                         .and_then(|v| v.as_str())
                         .unwrap_or("Unknown error");
@@ -326,52 +491,55 @@ impl CozeApiClient {
                 }
             }
         }
-        
+
         // 提取data字段或使用整个响应
         let data = response_value.get("data").unwrap_or(&response_value);
-        
+
         serde_json::from_value(data.clone()).map_err(ApiError::from)
     }
-    
+
     /// 发送流式聊天请求
     pub async fn chat_stream(
         &self,
         request: crate::api::chat_models::ChatRequest,
-    ) -> Result<impl futures::Stream<Item = Result<crate::api::chat_models::StreamChatResponse, ApiError>>, ApiError> {
+    ) -> Result<
+        impl futures::Stream<Item = Result<crate::api::chat_models::StreamChatResponse, ApiError>>,
+        ApiError,
+    > {
         use crate::api::endpoints::chat::CHAT_V3_STREAM;
         use futures::stream::StreamExt;
-        
+
         let url = format!("{}{}", self.base_url, CHAT_V3_STREAM);
-        
+
         let mut req = request;
         req.stream = Some(true); // 确保流式
-        
+
         let payload = serde_json::to_value(&req).map_err(ApiError::from)?;
-        
-        let request_builder = self.client
+
+        let request_builder = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
             .json(&payload);
-        
+
         let response = request_builder.send().await?;
-        
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await?;
             return Err(ApiError::from_response(status, body));
         }
-        
-        let stream = response.bytes_stream()
+
+        let stream = response
+            .bytes_stream()
             .map(|chunk_result| {
-                chunk_result
-                    .map_err(ApiError::from)
-                    .and_then(|chunk| {
-                        let text = String::from_utf8_lossy(&chunk);
-                        Self::parse_sse_chunk(&text)
-                    })
+                chunk_result.map_err(ApiError::from).and_then(|chunk| {
+                    let text = String::from_utf8_lossy(&chunk);
+                    Self::parse_sse_chunk(&text)
+                })
             })
             .filter_map(|result| async move {
                 match result {
@@ -380,20 +548,22 @@ impl CozeApiClient {
                     Err(e) => Some(Err(e)),
                 }
             });
-        
+
         Ok(stream)
     }
-    
+
     /// 解析SSE (Server-Sent Events) 数据块
-    fn parse_sse_chunk(text: &str) -> Result<Option<crate::api::chat_models::StreamChatResponse>, ApiError> {
+    fn parse_sse_chunk(
+        text: &str,
+    ) -> Result<Option<crate::api::chat_models::StreamChatResponse>, ApiError> {
         for line in text.lines() {
             let line = line.trim();
-            
+
             // 跳过空行和注释
             if line.is_empty() || line.starts_with(':') {
                 continue;
             }
-            
+
             // 解析data字段
             if let Some(data) = line.strip_prefix("data: ") {
                 if data == "[DONE]" {
@@ -407,15 +577,16 @@ impl CozeApiClient {
                         last_error: None,
                     }));
                 }
-                
-                let parsed: serde_json::Value = serde_json::from_str(data)
-                    .map_err(ApiError::from)?;
-                
+
+                let parsed: serde_json::Value =
+                    serde_json::from_str(data).map_err(ApiError::from)?;
+
                 // 检查是否有业务错误
                 if let Some(code) = parsed.get("code") {
                     if let Some(code_num) = code.as_i64() {
                         if code_num != 0 {
-                            let msg = parsed.get("msg")
+                            let msg = parsed
+                                .get("msg")
                                 .or_else(|| parsed.get("message"))
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("Unknown error");
@@ -428,17 +599,17 @@ impl CozeApiClient {
                         }
                     }
                 }
-                
+
                 // 提取data字段或使用整个响应
                 let data_field = parsed.get("data").unwrap_or(&parsed);
-                
-                let response: crate::api::chat_models::StreamChatResponse = 
+
+                let response: crate::api::chat_models::StreamChatResponse =
                     serde_json::from_value(data_field.clone()).map_err(ApiError::from)?;
-                
+
                 return Ok(Some(response));
             }
         }
-        
+
         Ok(None)
     }
 
@@ -448,18 +619,24 @@ impl CozeApiClient {
         request: &crate::api::bot_models::ListBotsRequest,
     ) -> Result<crate::api::bot_models::ListBotsResponse, ApiError> {
         use crate::api::endpoints::bots::LIST_BOTS;
-        
-        let url = format!("{}{}?{}", self.base_url, LIST_BOTS, request.to_query_params());
-        
+
+        let url = format!(
+            "{}{}?{}",
+            self.base_url,
+            LIST_BOTS,
+            request.to_query_params()
+        );
+
         let response = self.send_raw_request("GET", &url, None).await?;
         let text = response.text().await.map_err(ApiError::from)?;
-        
+
         let parsed: serde_json::Value = serde_json::from_str(&text).map_err(ApiError::from)?;
-        
+
         // 检查业务错误
         if let Some(code) = parsed.get("code").and_then(|v| v.as_i64()) {
             if code != 0 {
-                let msg = parsed.get("msg")
+                let msg = parsed
+                    .get("msg")
                     .or_else(|| parsed.get("message"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown error");
@@ -471,11 +648,11 @@ impl CozeApiClient {
                 )));
             }
         }
-        
+
         // 解析响应
-        let response: crate::api::bot_models::ListBotsResponse = 
+        let response: crate::api::bot_models::ListBotsResponse =
             serde_json::from_str(&text).map_err(ApiError::from)?;
-        
+
         Ok(response)
     }
 
@@ -486,19 +663,25 @@ impl CozeApiClient {
         chat_id: &str,
     ) -> Result<crate::api::chat_models::ChatResponse, ApiError> {
         use crate::api::endpoints::chat::GET_CHAT_DETAIL;
-        
-        let url = format!("{}{}?conversation_id={}&chat_id={}", 
-            self.base_url, GET_CHAT_DETAIL, encode(conversation_id), encode(chat_id));
-        
+
+        let url = format!(
+            "{}{}?conversation_id={}&chat_id={}",
+            self.base_url,
+            GET_CHAT_DETAIL,
+            encode(conversation_id),
+            encode(chat_id)
+        );
+
         let response = self.send_raw_request("GET", &url, None).await?;
         let text = response.text().await.map_err(ApiError::from)?;
-        
+
         let parsed: serde_json::Value = serde_json::from_str(&text).map_err(ApiError::from)?;
-        
+
         // 检查业务错误
         if let Some(code) = parsed.get("code").and_then(|v| v.as_i64()) {
             if code != 0 {
-                let msg = parsed.get("msg")
+                let msg = parsed
+                    .get("msg")
                     .or_else(|| parsed.get("message"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown error");
@@ -510,7 +693,7 @@ impl CozeApiClient {
                 )));
             }
         }
-        
+
         // 提取data字段或使用整个响应
         let data = parsed.get("data").unwrap_or(&parsed);
         serde_json::from_value(data.clone()).map_err(ApiError::from)
@@ -523,19 +706,25 @@ impl CozeApiClient {
         chat_id: &str,
     ) -> Result<Vec<crate::api::chat_models::ChatMessage>, ApiError> {
         use crate::api::endpoints::chat::GET_CHAT_MESSAGES;
-        
-        let url = format!("{}{}?conversation_id={}&chat_id={}", 
-            self.base_url, GET_CHAT_MESSAGES, encode(conversation_id), encode(chat_id));
-        
+
+        let url = format!(
+            "{}{}?conversation_id={}&chat_id={}",
+            self.base_url,
+            GET_CHAT_MESSAGES,
+            encode(conversation_id),
+            encode(chat_id)
+        );
+
         let response = self.send_raw_request("GET", &url, None).await?;
         let text = response.text().await.map_err(ApiError::from)?;
-        
+
         let parsed: serde_json::Value = serde_json::from_str(&text).map_err(ApiError::from)?;
-        
+
         // 检查业务错误
         if let Some(code) = parsed.get("code").and_then(|v| v.as_i64()) {
             if code != 0 {
-                let msg = parsed.get("msg")
+                let msg = parsed
+                    .get("msg")
                     .or_else(|| parsed.get("message"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown error");
@@ -547,18 +736,16 @@ impl CozeApiClient {
                 )));
             }
         }
-        
+
         // 提取messages字段
         let empty_array = serde_json::Value::Array(vec![]);
-        let messages = parsed.get("data")
+        let messages = parsed
+            .get("data")
             .and_then(|d| d.get("data"))
             .or_else(|| parsed.get("data"))
             .or_else(|| parsed.get("messages"))
             .unwrap_or(&empty_array);
-            
+
         serde_json::from_value(messages.clone()).map_err(ApiError::from)
     }
-
 }
-
-

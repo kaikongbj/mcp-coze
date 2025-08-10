@@ -114,8 +114,11 @@ impl ListBotsRequest {
 
     /// 构建查询参数字符串
     pub fn to_query_params(&self) -> String {
-        let mut params = vec![format!("workspace_id={}", urlencoding::encode(&self.workspace_id))];
-        
+        let mut params = vec![format!(
+            "workspace_id={}",
+            urlencoding::encode(&self.workspace_id)
+        )];
+
         if let Some(ref status) = self.publish_status {
             let status_str = match status {
                 BotPublishStatus::All => "all",
@@ -125,19 +128,22 @@ impl ListBotsRequest {
             };
             params.push(format!("publish_status={status_str}"));
         }
-        
+
         if let Some(ref connector_id) = self.connector_id {
-            params.push(format!("connector_id={}", urlencoding::encode(connector_id)));
+            params.push(format!(
+                "connector_id={}",
+                urlencoding::encode(connector_id)
+            ));
         }
-        
+
         if let Some(page_num) = self.page_num {
             params.push(format!("page_num={page_num}"));
         }
-        
+
         if let Some(page_size) = self.page_size {
             params.push(format!("page_size={page_size}"));
         }
-        
+
         params.join("&")
     }
 }

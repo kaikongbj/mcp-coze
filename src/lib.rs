@@ -1,4 +1,4 @@
 pub mod api;
-pub mod models;
 pub mod knowledge;
+pub mod models;
 pub mod tools;

@@ -61,13 +61,30 @@ impl ConfigTool {
             .ok_or_else(|| McpError::invalid_params("Missing api_key parameter", None))?;
 
         if api_key.trim().is_empty() {
-            return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text("API Key不能为空")]), is_error: Some(true), structured_content: None });
+            return Ok(CallToolResult {
+                content: Some(vec![rmcp::model::Content::text("API Key不能为空")]),
+                is_error: Some(true),
+                structured_content: None,
+            });
         }
         if !api_key.starts_with("pat_") && api_key.len() < 10 {
-            return Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text("无效的API Key格式，应该是以pat_开头的个人访问令牌")]), is_error: Some(true), structured_content: None });
+            return Ok(CallToolResult {
+                content: Some(vec![rmcp::model::Content::text(
+                    "无效的API Key格式，应该是以pat_开头的个人访问令牌",
+                )]),
+                is_error: Some(true),
+                structured_content: None,
+            });
         }
         self.set_api_key_str(api_key.to_string()).await;
-        Ok(CallToolResult { content: Some(vec![rmcp::model::Content::text(format!("API Key设置成功！\n已配置的Key: {}...", &api_key[..8]))]), is_error: Some(false), structured_content: None })
+        Ok(CallToolResult {
+            content: Some(vec![rmcp::model::Content::text(format!(
+                "API Key设置成功！\n已配置的Key: {}...",
+                &api_key[..8]
+            ))]),
+            is_error: Some(false),
+            structured_content: None,
+        })
     }
 
     pub async fn set_api_key_str(&self, api_key: String) {
@@ -76,7 +93,10 @@ impl ConfigTool {
         self.is_configured.store(true, Ordering::SeqCst);
     }
 
-    pub async fn set_api_key_from_mcp(&self, args: Option<Value>) -> Result<CallToolResult, McpError> {
+    pub async fn set_api_key_from_mcp(
+        &self,
+        args: Option<Value>,
+    ) -> Result<CallToolResult, McpError> {
         let args = args.ok_or_else(|| McpError::invalid_params("Missing arguments", None))?;
 
         let api_key = args
@@ -105,7 +125,7 @@ impl ConfigTool {
         }
 
         self.set_api_key(api_key.clone()).await;
-    // 同上：暂不更新底层客户端（需要内部可变性支持）
+        // 同上：暂不更新底层客户端（需要内部可变性支持）
 
         Ok(CallToolResult {
             content: Some(vec![rmcp::model::Content::text(format!(

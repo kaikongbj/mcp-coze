@@ -28,9 +28,12 @@ mod tests {
     #[test]
     fn test_list_bots_request_creation() {
         let request = ListBotsRequest::new("test_workspace_123".to_string());
-        
+
         assert_eq!(request.workspace_id, "test_workspace_123");
-        assert!(matches!(request.publish_status, Some(BotPublishStatus::PublishedOnline)));
+        assert!(matches!(
+            request.publish_status,
+            Some(BotPublishStatus::PublishedOnline)
+        ));
         assert_eq!(request.connector_id, Some("1024".to_string()));
         assert_eq!(request.page_num, Some(1));
         assert_eq!(request.page_size, Some(20));
@@ -42,9 +45,12 @@ mod tests {
             .with_publish_status(BotPublishStatus::All)
             .with_connector_id("2048".to_string())
             .with_page(2, 50);
-        
+
         assert_eq!(request.workspace_id, "workspace_456");
-        assert!(matches!(request.publish_status, Some(BotPublishStatus::All)));
+        assert!(matches!(
+            request.publish_status,
+            Some(BotPublishStatus::All)
+        ));
         assert_eq!(request.connector_id, Some("2048".to_string()));
         assert_eq!(request.page_num, Some(2));
         assert_eq!(request.page_size, Some(50));
@@ -55,9 +61,9 @@ mod tests {
         let request = ListBotsRequest::new("test%20workspace".to_string())
             .with_publish_status(BotPublishStatus::PublishedDraft)
             .with_page(3, 15);
-        
+
         let query_params = request.to_query_params();
-        
+
         assert!(query_params.contains("workspace_id=test%2520workspace"));
         assert!(query_params.contains("publish_status=published_draft"));
         assert!(query_params.contains("connector_id=1024"));
@@ -76,7 +82,7 @@ mod tests {
             is_published: Some(true),
             owner_user_id: Some("user_456".to_string()),
         };
-        
+
         let serialized = serde_json::to_value(&bot).unwrap();
         assert_eq!(serialized["id"], "bot_123");
         assert_eq!(serialized["name"], "测试机器人");
@@ -96,11 +102,14 @@ mod tests {
             "is_published": false,
             "owner_user_id": "23423423****"
         });
-        
+
         let bot: BotInfo = serde_json::from_value(json).unwrap();
         assert_eq!(bot.id, "7493066380997****");
         assert_eq!(bot.name, "语音伴侣");
-        assert_eq!(bot.icon_url, Some("https://example.com/agent1***.png".to_string()));
+        assert_eq!(
+            bot.icon_url,
+            Some("https://example.com/agent1***.png".to_string())
+        );
         assert_eq!(bot.updated_at, Some(1718289297));
         assert_eq!(bot.description, Some("语音伴侣".to_string()));
         assert_eq!(bot.is_published, Some(false));
@@ -130,13 +139,13 @@ mod tests {
                 "logid": "20241210152726467C48D89D6DB2****"
             }
         });
-        
+
         let response: ListBotsResponse = serde_json::from_value(json).unwrap();
         assert_eq!(response.code, 0);
         assert_eq!(response.msg, "Success");
         assert_eq!(response.data.total, 1);
         assert_eq!(response.data.items.len(), 1);
-        
+
         let bot = &response.data.items[0];
         assert_eq!(bot.id, "7493066380997****");
         assert_eq!(bot.name, "语音伴侣");
@@ -149,7 +158,7 @@ mod tests {
             "id": "minimal_bot",
             "name": "极简机器人"
         });
-        
+
         let bot: BotInfo = serde_json::from_value(json).unwrap();
         assert_eq!(bot.id, "minimal_bot");
         assert_eq!(bot.name, "极简机器人");

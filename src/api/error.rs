@@ -5,8 +5,10 @@ use std::fmt;
 pub struct ApiErrorData {
     pub kind: String,
     pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")] pub status: Option<u16>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub raw_body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw_body: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +28,12 @@ pub enum ApiError {
 
 impl ApiErrorData {
     pub fn new(kind: &str, message: String, status: Option<u16>, raw_body: Option<String>) -> Self {
-        Self { kind: kind.to_string(), message, status, raw_body }
+        Self {
+            kind: kind.to_string(),
+            message,
+            status,
+            raw_body,
+        }
     }
 }
 
@@ -41,7 +48,9 @@ impl fmt::Display for ApiError {
             ApiError::NotFound(d) => write!(f, "Resource not found: {}", d.message),
             ApiError::RateLimitExceeded(d) => write!(f, "Rate limit exceeded: {}", d.message),
             ApiError::ServerError(d) => write!(f, "Server error: {}", d.message),
-            ApiError::InvalidResponseFormat(d) => write!(f, "Invalid response format: {}", d.message),
+            ApiError::InvalidResponseFormat(d) => {
+                write!(f, "Invalid response format: {}", d.message)
+            }
             ApiError::SerializationError(d) => write!(f, "Serialization error: {}", d.message),
             ApiError::ConfigError(d) => write!(f, "Configuration error: {}", d.message),
         }
@@ -75,31 +84,37 @@ impl From<reqwest::Error> for ApiError {
 
 impl From<serde_json::Error> for ApiError {
     fn from(err: serde_json::Error) -> Self {
-    ApiError::SerializationError(ApiErrorData::new("serialization", err.to_string(), None, None))
+        ApiError::SerializationError(ApiErrorData::new(
+            "serialization",
+            err.to_string(),
+            None,
+            None,
+        ))
     }
 }
 
 impl From<std::io::Error> for ApiError {
     fn from(err: std::io::Error) -> Self {
-    ApiError::NetworkError(ApiErrorData::new("io", err.to_string(), None, None))
+        ApiError::NetworkError(ApiErrorData::new("io", err.to_string(), None, None))
     }
 }
 
 impl ApiError {
     pub fn from_response(status: reqwest::StatusCode, body: String) -> Self {
         let error_message = match serde_json::from_str::<serde_json::Value>(&body) {
-            Ok(json) => {
-                json.get("msg")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| json.get("message").and_then(|v| v.as_str()))
-                    .unwrap_or(&body)
-                    .to_string()
-            }
+            Ok(json) => json
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .or_else(|| json.get("message").and_then(|v| v.as_str()))
+                .unwrap_or(&body)
+                .to_string(),
             Err(_) => body.clone(),
         };
 
         let code = status.as_u16();
-        let data = |kind: &str| ApiErrorData::new(kind, error_message.clone(), Some(code), Some(body.clone()));
+        let data = |kind: &str| {
+            ApiErrorData::new(kind, error_message.clone(), Some(code), Some(body.clone()))
+        };
         match code {
             400 => ApiError::BadRequest(data("bad_request")),
             401 => ApiError::AuthenticationError(data("authentication")),
