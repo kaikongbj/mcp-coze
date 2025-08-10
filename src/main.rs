@@ -270,7 +270,7 @@ impl ServerHandler for CozeServer {
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation {
                 name: "coze-mcp-server".into(),
-                version: "0.2.2".into(),
+                version: "0.2.3".into(),
             },
             // 在 instructions 中嵌入工具名称，便于客户端未调用 list_tools 时人工确认
             instructions: Some("Coze MCP Server ready.".to_string()),
