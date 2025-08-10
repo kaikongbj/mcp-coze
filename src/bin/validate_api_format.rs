@@ -74,7 +74,7 @@ fn main() {
                 }
             }
         }
-        Err(e) => println!("   ❌ 格式1JSON解析失败: {}", e),
+        Err(e) => println!("   ❌ 格式1JSON解析失败: {e}"),
     }
     
     // 测试格式2：直接datasets结构
@@ -103,7 +103,7 @@ fn main() {
                 println!("   ✅ 所有必需字段验证通过！");
             }
         }
-        Err(e) => println!("   ❌ 格式2解析失败: {}", e),
+        Err(e) => println!("   ❌ 格式2解析失败: {e}"),
     }
     
     // 测试字段映射
@@ -126,7 +126,7 @@ fn main() {
             println!("   create_time -> {}", info.created_at);
             println!("   doc_count -> {}", info.document_count);
         }
-        Err(e) => println!("   ❌ 字段映射验证失败: {}", e),
+        Err(e) => println!("   ❌ 字段映射验证失败: {e}"),
     }
     
     println!("🎉 所有API格式验证完成！");

@@ -196,8 +196,7 @@ impl CozeTools {
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(format!(
-                        "获取知识库列表失败: {}",
-                        e
+                        "获取知识库列表失败: {e}"
                     ))]),
                     is_error: Some(true),
                     structured_content: Some(json!({"error": serialized})),
@@ -257,7 +256,7 @@ impl CozeTools {
         match self.coze_client.list_bots_typed(&request).await {
             Ok(response) => {
                 let total = response.data.total;
-                let mut out = format!("找到 {} 个 Bot:\n\n", total);
+                let mut out = format!("找到 {total} 个 Bot:\n\n");
                 let mut sc_items: Vec<Value> = Vec::new();
                 
                 for (i, bot) in response.data.items.iter().take(5).enumerate() {
@@ -298,8 +297,7 @@ impl CozeTools {
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(format!(
-                        "[Bots] 请求失败: {}",
-                        e
+                        "[Bots] 请求失败: {e}"
                     ))]),
                     is_error: Some(true),
                     structured_content: Some(json!({"error": serialized})),
@@ -322,7 +320,7 @@ impl CozeTools {
             Ok(resp) => {
                 let data = resp.body.get("data").cloned().unwrap_or(resp.body);
                 let (items, total) = Self::extract_list_and_total(&data);
-                let mut out = format!("找到 {} 个 Workspace:\n\n", total);
+                let mut out = format!("找到 {total} 个 Workspace:\n\n");
                 let mut sc_items: Vec<Value> = Vec::new();
                 for (i, it) in items.iter().take(5).enumerate() {
                     if let Some(obj) = it.as_object() {
@@ -343,8 +341,7 @@ impl CozeTools {
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(format!(
-                        "[Workspaces] 请求失败: {}",
-                        e
+                        "[Workspaces] 请求失败: {e}"
                     ))]),
                     is_error: Some(true),
                     structured_content: Some(json!({"error": serialized})),
@@ -496,8 +493,8 @@ impl CozeTools {
                         format_type_str,
                         format_type,
                         space_id,
-                        description.map(|d| format!("\n- 描述: {}", d)).unwrap_or_default(),
-                        file_id.map(|f| format!("\n- 图标文件ID: {}", f)).unwrap_or_default(),
+                        description.map(|d| format!("\n- 描述: {d}")).unwrap_or_default(),
+                        file_id.map(|f| format!("\n- 图标文件ID: {f}")).unwrap_or_default(),
                         response.detail.as_ref().map(|d| format!("\n- 日志ID: {}", d.logid)).unwrap_or_default()
                     );
                     
@@ -548,7 +545,7 @@ impl CozeTools {
                 }
             }
             Err(e) => {
-                let error_msg = format!("API 调用失败: {}", e);
+                let error_msg = format!("API 调用失败: {e}");
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(error_msg.clone())]),
                     is_error: Some(true),
@@ -602,7 +599,7 @@ impl CozeTools {
             Err(e) => {
                 return Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(format!(
-                        "Failed to read file metadata: {}", e
+                        "Failed to read file metadata: {e}"
                     ))]),
                     is_error: Some(true),
                     structured_content: Some(serde_json::json!({
@@ -625,7 +622,7 @@ impl CozeTools {
 
         let bytes = fs::read(file_path)
             .await
-            .map_err(|e| McpError::invalid_params(format!("Failed to read file: {}", e), None))?;
+            .map_err(|e| McpError::invalid_params(format!("Failed to read file: {e}"), None))?;
         let ext = std::path::Path::new(file_path)
             .extension()
             .and_then(|e| e.to_str())
@@ -668,8 +665,7 @@ impl CozeTools {
             Ok(resp) => {
                 let infos_len = resp.document_infos.as_ref().map(|v| v.len()).unwrap_or(0);
                 let content = format!(
-                    "文档上传成功: dataset_id={}, 文件='{}', size={} bytes, documents_returned={}",
-                    dataset_id, document_name, file_size, infos_len
+                    "文档上传成功: dataset_id={dataset_id}, 文件='{document_name}', size={file_size} bytes, documents_returned={infos_len}"
                 );
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(content)]),
@@ -685,13 +681,12 @@ impl CozeTools {
                 })
             }
             Err(e) => {
-                println!("Failed to upload document: {:?}", e);
+                println!("Failed to upload document: {e:?}");
                 let serialized =
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(format!(
-                        "文档上传失败: {:?}",
-                        e
+                        "文档上传失败: {e:?}"
                     ))]),
                     is_error: Some(true),
                     structured_content: Some(json!({"error": serialized})),
@@ -740,8 +735,7 @@ impl CozeTools {
                 let data = body.get("data").cloned().unwrap_or(body);
                 let (items, total) = Self::extract_list_and_total(&data);
                 let mut out = format!(
-                    "{} 条会话，page={}, page_size={}:\n\n",
-                    total, page, page_size
+                    "{total} 条会话，page={page}, page_size={page_size}:\n\n"
                 );
                 let mut sc: Vec<Value> = Vec::new();
                 for (i, it) in items.iter().take(5).enumerate() {
@@ -763,8 +757,7 @@ impl CozeTools {
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(format!(
-                        "[List Conversations] 请求失败: {}",
-                        e
+                        "[List Conversations] 请求失败: {e}"
                     ))]),
                     is_error: Some(true),
                     structured_content: Some(json!({"error": serialized})),
@@ -843,9 +836,9 @@ impl CozeTools {
                     .and_then(|v| v.as_str()).is_none();
                 
                 let user_id_info = if was_user_id_generated {
-                    format!("user_id: {} (自动生成)\n", user_id)
+                    format!("user_id: {user_id} (自动生成)\n")
                 } else {
-                    format!("user_id: {} (用户提供)\n", user_id)
+                    format!("user_id: {user_id} (用户提供)\n")
                 };
                 
                 // 如果状态是in_progress，等待完成并获取最终消息
@@ -923,7 +916,7 @@ impl CozeTools {
                             }
                             Err(e) => {
                                 // 无法获取详情，继续等待
-                                println!("等待对话完成... (尝试 {}/{}，错误: {})", attempts, MAX_ATTEMPTS, e);
+                                println!("等待对话完成... (尝试 {attempts}/{MAX_ATTEMPTS}，错误: {e})");
                             }
                         }
                     }
@@ -965,7 +958,7 @@ impl CozeTools {
                 }
             }
             Err(e) => {
-                let error_msg = format!("[Chat] 聊天失败: {}", e);
+                let error_msg = format!("[Chat] 聊天失败: {e}");
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(error_msg)]),
                     is_error: Some(true),
@@ -1091,7 +1084,7 @@ impl CozeTools {
                         Err(e) => {
                             return Ok(CallToolResult {
                                 content: Some(vec![rmcp::model::Content::text(
-                                    format!("[Chat Stream] 流式响应错误: {}", e)
+                                    format!("[Chat Stream] 流式响应错误: {e}")
                                 )]),
                                 is_error: Some(true),
                                 structured_content: Some(json!({
@@ -1104,11 +1097,7 @@ impl CozeTools {
                 }
                 
                 let output = format!(
-                    "对话ID: {}\n消息ID: {}\n完整回复:\n{}\n\n使用情况: {:?}",
-                    conversation_id,
-                    message_id,
-                    full_content,
-                    final_usage
+                    "对话ID: {conversation_id}\n消息ID: {message_id}\n完整回复:\n{full_content}\n\n使用情况: {final_usage:?}"
                 );
                 
                 Ok(CallToolResult {
@@ -1124,7 +1113,7 @@ impl CozeTools {
                 })
             }
             Err(e) => {
-                let error_msg = format!("[Chat Stream] 流式聊天失败: {}", e);
+                let error_msg = format!("[Chat Stream] 流式聊天失败: {e}");
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(error_msg)]),
                     is_error: Some(true),

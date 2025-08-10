@@ -131,8 +131,7 @@ impl ConfigTool {
 
         Ok(CallToolResult {
             content: Some(vec![rmcp::model::Content::text(format!(
-                "配置状态:\nAPI Key已配置: {}\nKey预览: {}",
-                is_configured, key_preview
+                "配置状态:\nAPI Key已配置: {is_configured}\nKey预览: {key_preview}"
             ))]),
             is_error: Some(false),
             structured_content: None,

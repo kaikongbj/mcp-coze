@@ -137,6 +137,7 @@ pub struct CreateDatasetRequest {
 
 impl CreateDatasetRequest {
     /// 创建文本类型知识库请求
+    #[allow(dead_code)]
     pub fn new_text(name: String, space_id: String, description: Option<String>) -> Self {
         Self {
             name,
@@ -148,6 +149,7 @@ impl CreateDatasetRequest {
     }
 
     /// 创建图片类型知识库请求
+    #[allow(dead_code)]
     pub fn new_image(name: String, space_id: String, description: Option<String>) -> Self {
         Self {
             name,
@@ -159,6 +161,7 @@ impl CreateDatasetRequest {
     }
 
     /// 设置知识库图标
+    #[allow(dead_code)]
     pub fn with_icon(mut self, file_id: String) -> Self {
         self.file_id = Some(file_id);
         self

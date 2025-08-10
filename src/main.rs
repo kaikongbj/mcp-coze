@@ -82,7 +82,7 @@ impl ServerHandler for CozeServer {
                 structured_content: Some(serde_json::json!({"ok":true})),
             }),
             _ => Err(McpError::invalid_params(
-                format!("Unknown tool: {}", tool_name),
+                format!("Unknown tool: {tool_name}"),
                 None,
             )),
         };

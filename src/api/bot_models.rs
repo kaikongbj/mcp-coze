@@ -123,7 +123,7 @@ impl ListBotsRequest {
                 BotPublishStatus::PublishedDraft => "published_draft",
                 BotPublishStatus::UnpublishedDraft => "unpublished_draft",
             };
-            params.push(format!("publish_status={}", status_str));
+            params.push(format!("publish_status={status_str}"));
         }
         
         if let Some(ref connector_id) = self.connector_id {
@@ -131,11 +131,11 @@ impl ListBotsRequest {
         }
         
         if let Some(page_num) = self.page_num {
-            params.push(format!("page_num={}", page_num));
+            params.push(format!("page_num={page_num}"));
         }
         
         if let Some(page_size) = self.page_size {
-            params.push(format!("page_size={}", page_size));
+            params.push(format!("page_size={page_size}"));
         }
         
         params.join("&")

@@ -19,7 +19,7 @@ impl CozeApiClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .map_err(|e| ApiError::ConfigError(ApiErrorData::new("config", format!("Failed to build HTTP client: {}", e), None, None)))?;
+            .map_err(|e| ApiError::ConfigError(ApiErrorData::new("config", format!("Failed to build HTTP client: {e}"), None, None)))?;
 
         Ok(Self {
             client,
@@ -121,6 +121,7 @@ impl CozeApiClient {
 
     /// Create knowledge base with permission (legacy compatibility method)
     /// This method wraps the standard create_dataset API with additional parameters
+    #[allow(dead_code)]
     pub async fn create_knowledge_base_with_permission(
         &self,
         name: String,
@@ -158,9 +159,9 @@ impl CozeApiClient {
         let url = format!("{}{}", self.base_url, KNOWLEDGE_DOCUMENT_CREATE_URL);
     let sanitized = req.sanitized();
     let payload = serde_json::to_value(&sanitized).map_err(ApiError::from)?;
-        println!("Upload payload: {:?}", payload);
+        println!("Upload payload: {payload:?}");
         let resp = self.send_raw_request("POST", &url, Some(payload)).await?;
-        println!("Upload response: {:?}", resp);
+        println!("Upload response: {resp:?}");
         self.process_response(resp).await
     }
 
@@ -186,8 +187,8 @@ impl CozeApiClient {
         use crate::api::endpoints::conversation::LIST_CONVERSATIONS;
         let mut url = format!("{}{}?bot_id={}", self.base_url, LIST_CONVERSATIONS, encode(bot_id));
         if let Some(ws) = workspace_id { url.push_str(&format!("&workspace_id={}", encode(ws))); }
-        if let Some(p) = page { url.push_str(&format!("&page={}", p)); }
-        if let Some(ps) = page_size { url.push_str(&format!("&page_size={}", ps)); }
+        if let Some(p) = page { url.push_str(&format!("&page={p}")); }
+        if let Some(ps) = page_size { url.push_str(&format!("&page_size={ps}")); }
         let resp = self.send_raw_request("GET", &url, None).await?;
         self.process_response(resp).await
     }
@@ -222,9 +223,9 @@ impl CozeApiClient {
     if let Some(ps) = page_size { if ps == 0 || ps > 300 { return Err(ApiError::BadRequest(ApiErrorData::new("bad_request", "page_size must be in 1..=300".to_string(), None, None))); } }
         let mut url = format!("{}{}?space_id={}", self.base_url, LIST_DATASETS, encode(space_id));
         if let Some(n) = name { if !n.is_empty() { url.push_str(&format!("&name={}", encode(n))); } }
-        if let Some(f) = format_type { url.push_str(&format!("&format_type={}", f)); }
-        if let Some(pn) = page_num { url.push_str(&format!("&page_num={}", pn)); }
-        if let Some(ps) = page_size { url.push_str(&format!("&page_size={}", ps)); }
+        if let Some(f) = format_type { url.push_str(&format!("&format_type={f}")); }
+        if let Some(pn) = page_num { url.push_str(&format!("&page_num={pn}")); }
+        if let Some(ps) = page_size { url.push_str(&format!("&page_size={ps}")); }
         let resp = self.send_raw_request("GET", &url, None).await?;
         let raw_text_status = resp.status();
         let text = resp.text().await?;
@@ -318,7 +319,7 @@ impl CozeApiClient {
                         .unwrap_or("Unknown error");
                     return Err(ApiError::BadRequest(ApiErrorData::new(
                         "api_error",
-                        format!("API returned error code {}: {}", code_num, msg),
+                        format!("API returned error code {code_num}: {msg}"),
                         Some(status.as_u16()),
                         Some(body),
                     )));
@@ -420,7 +421,7 @@ impl CozeApiClient {
                                 .unwrap_or("Unknown error");
                             return Err(ApiError::BadRequest(ApiErrorData::new(
                                 "stream_error",
-                                format!("Stream returned error code {}: {}", code_num, msg),
+                                format!("Stream returned error code {code_num}: {msg}"),
                                 None,
                                 Some(data.to_string()),
                             )));
@@ -464,7 +465,7 @@ impl CozeApiClient {
                     .unwrap_or("Unknown error");
                 return Err(ApiError::BadRequest(ApiErrorData::new(
                     "list_bots",
-                    format!("API returned error code {}: {}", code, msg),
+                    format!("API returned error code {code}: {msg}"),
                     None,
                     Some(text),
                 )));
@@ -503,7 +504,7 @@ impl CozeApiClient {
                     .unwrap_or("Unknown error");
                 return Err(ApiError::BadRequest(ApiErrorData::new(
                     "get_chat_detail",
-                    format!("API returned error code {}: {}", code, msg),
+                    format!("API returned error code {code}: {msg}"),
                     None,
                     Some(text),
                 )));
@@ -540,7 +541,7 @@ impl CozeApiClient {
                     .unwrap_or("Unknown error");
                 return Err(ApiError::BadRequest(ApiErrorData::new(
                     "get_chat_messages",
-                    format!("API returned error code {}: {}", code, msg),
+                    format!("API returned error code {code}: {msg}"),
                     None,
                     Some(text),
                 )));
