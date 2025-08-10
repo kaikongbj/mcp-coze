@@ -109,13 +109,13 @@ impl CozeApiClient {
         
         let body_text = response.text().await?;
         let body: serde_json::Value = serde_json::from_str(&body_text)
-            .unwrap_or_else(|_| serde_json::Value::String(body_text));
+            .unwrap_or(serde_json::Value::String(body_text));
 
         Ok(crate::models::CozeApiResponse {
             status_code,
             headers,
             body,
-            success: status_code >= 200 && status_code < 300,
+            success: (200..300).contains(&status_code),
         })
     }
 
@@ -144,7 +144,7 @@ impl CozeApiClient {
         let response = self.create_dataset(request).await?;
         
         // Convert to generic JSON value for compatibility
-        Ok(serde_json::to_value(response).map_err(ApiError::from)?)
+        serde_json::to_value(response).map_err(ApiError::from)
     }
 
     // Removed deprecated create_knowledge_base* variants (single public path retained at tool layer if needed)
