@@ -61,59 +61,14 @@ impl CozeTools {
             })
             .ok_or_else(|| McpError::invalid_params("Missing space_id parameter", None))?
             .to_string();
-        let name = args
-            .get("name")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-        let format_type = args
-            .get("format_type")
-            .and_then(|v| v.as_i64())
-            .map(|n| n as i32);
-        let page_num = args
-            .get("page_num")
-            .and_then(|v| v.as_u64())
-            .map(|n| n as u32)
-            .or(Some(1));
-        let page_size = args
-            .get("page_size")
-            .and_then(|v| v.as_u64())
-            .map(|n| n as u32);
-        let accurate_counts = args
-            .get("accurate_counts")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let detailed = args
-            .get("detailed")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
         // 使用统一 /v1/datasets 接口
         match self
             .coze_client
-            .list_datasets(&space_id, name.as_deref(), format_type, page_num, page_size)
+            .list_datasets(&space_id, None, None, None, None)
             .await
         {
             Ok(mut result) => {
                 // Optional: refine document_count by fetching dataset detail (limited to first 50 to avoid many requests)
-                if accurate_counts {
-                    let limit = result.datasets.len().min(50);
-                    for i in 0..limit {
-                        let ds_id = result.datasets[i].dataset_id.clone();
-                        if let Ok(detail) = self.coze_client.get_dataset_cn(&ds_id).await {
-                            let data = detail.get("data").cloned().unwrap_or(detail);
-                            if let Some(obj) = data.as_object() {
-                                let doc_count = obj
-                                    .get("file_list")
-                                    .and_then(|v| v.as_array().map(|a| a.len() as u64))
-                                    .or_else(|| obj.get("doc_count").and_then(|v| v.as_u64()))
-                                    .or_else(|| obj.get("document_count").and_then(|v| v.as_u64()))
-                                    .or_else(|| obj.get("file_count").and_then(|v| v.as_u64()))
-                                    .unwrap_or(result.datasets[i].document_count as u64);
-                                result.datasets[i].document_count = doc_count as usize;
-                            }
-                        }
-                    }
-                }
                 let content = if result.datasets.is_empty() {
                     "没有找到知识库".to_string()
                 } else {
@@ -131,60 +86,43 @@ impl CozeTools {
                     }
                     response
                 };
-                let sc_items: Vec<Value> = if detailed {
-                    result
-                        .datasets
-                        .iter()
-                        .map(|kb| {
-                            json!({
-                                "dataset_id": kb.dataset_id,
-                                "name": kb.name,
-                                "description": kb.description,
-                                "document_count": kb.document_count,
-                                "created_at": kb.created_at,
-                                "update_time": kb.update_time,
-                                "status": kb.status,
-                                "format_type": kb.format_type,
-                                "slice_count": kb.slice_count,
-                                "space_id": kb.space_id,
-                                "dataset_type": kb.dataset_type,
-                                "can_edit": kb.can_edit,
-                                "icon_url": kb.icon_url,
-                                "icon_uri": kb.icon_uri,
-                                "avatar_url": kb.avatar_url,
-                                "creator_id": kb.creator_id,
-                                "creator_name": kb.creator_name,
-                                "hit_count": kb.hit_count,
-                                "all_file_size": kb.all_file_size,
-                                "bot_used_count": kb.bot_used_count,
-                                "file_list": kb.file_list,
-                                "failed_file_list": kb.failed_file_list,
-                                "processing_file_list": kb.processing_file_list,
-                                "processing_file_id_list": kb.processing_file_id_list,
-                                "chunk_strategy": kb.chunk_strategy,
-                                "storage_config": kb.storage_config,
-                                "project_id": kb.project_id,
-                                "raw_extra": kb.raw_extra,
-                            })
+                let sc_items: Vec<Value> = result
+                    .datasets
+                    .iter()
+                    .map(|kb| {
+                        json!({
+                            "dataset_id": kb.dataset_id,
+                            "name": kb.name,
+                            "description": kb.description,
+                            "document_count": kb.document_count,
+                            "created_at": kb.created_at,
+                            "update_time": kb.update_time,
+                            "status": kb.status,
+                            "format_type": kb.format_type,
+                            "slice_count": kb.slice_count,
+                            "space_id": kb.space_id,
+                            "dataset_type": kb.dataset_type,
+                            "can_edit": kb.can_edit,
+                            "icon_url": kb.icon_url,
+                            "icon_uri": kb.icon_uri,
+                            "avatar_url": kb.avatar_url,
+                            "creator_id": kb.creator_id,
+                            "creator_name": kb.creator_name,
+                            "hit_count": kb.hit_count,
+                            "all_file_size": kb.all_file_size,
+                            "bot_used_count": kb.bot_used_count,
+                            "file_list": kb.file_list,
+                            "failed_file_list": kb.failed_file_list,
+                            "processing_file_list": kb.processing_file_list,
+                            "processing_file_id_list": kb.processing_file_id_list,
+                            "chunk_strategy": kb.chunk_strategy,
+                            "storage_config": kb.storage_config,
+                            "project_id": kb.project_id,
+                            "raw_extra": kb.raw_extra,
                         })
-                        .collect()
-                } else {
-                    result
-                        .datasets
-                        .iter()
-                        .map(|kb| {
-                            json!({
-                                "dataset_id": kb.dataset_id,
-                                "name": kb.name,
-                                "description": kb.description,
-                                "document_count": kb.document_count,
-                                "created_at": kb.created_at,
-                            })
-                        })
-                        .collect()
-                };
-                let structured =
-                    json!({ "total": result.total, "detailed": detailed, "items": sc_items });
+                    })
+                    .collect();
+                let structured = json!({ "total": result.total,  "items": sc_items });
 
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(content)]),

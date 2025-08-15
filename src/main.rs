@@ -99,26 +99,26 @@ impl ServerHandler for CozeServer {
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
-                        "workspace_id": { 
-                            "type": "string", 
-                            "description": "工作区ID (必填，或使用默认space_id)" 
+                        "workspace_id": {
+                            "type": "string",
+                            "description": "工作区ID (必填，或使用默认space_id)"
                         },
-                        "publish_status": { 
-                            "type": "string", 
+                        "publish_status": {
+                            "type": "string",
                             "enum": ["all", "published_online", "published_draft", "unpublished_draft"],
-                            "description": "发布状态筛选：all(全部)、published_online(已发布正式版)、published_draft(已发布草稿)、unpublished_draft(未发布)，默认published_online" 
+                            "description": "发布状态筛选：all(全部)、published_online(已发布正式版)、published_draft(已发布草稿)、unpublished_draft(未发布)，默认published_online"
                         },
-                        "connector_id": { 
-                            "type": "string", 
-                            "description": "渠道ID，默认1024(API渠道)" 
+                        "connector_id": {
+                            "type": "string",
+                            "description": "渠道ID，默认1024(API渠道)"
                         },
-                        "page": { 
-                            "type": "number", 
-                            "description": "页码，默认1" 
+                        "page": {
+                            "type": "number",
+                            "description": "页码，默认1"
                         },
-                        "page_size": { 
-                            "type": "number", 
-                            "description": "每页数量，默认20" 
+                        "page_size": {
+                            "type": "number",
+                            "description": "每页数量，默认20"
                         }
                     },
                     "required": []
@@ -134,9 +134,6 @@ impl ServerHandler for CozeServer {
                     "type": "object",
                     "properties": {
                         "space_id": { "type": "string", "description": "空间ID (可选，使用默认space_id)" },
-                        "name": { "type": "string", "description": "按名称模糊搜索（可选）" },
-                        "page_num": { "type": "number", "description": "页码，默认1（可选）" },
-                        "page_size": { "type": "number", "description": "每页数量（可选）" }
                     },
                     "required": []
                 }).as_object().unwrap().clone()),
@@ -150,26 +147,26 @@ impl ServerHandler for CozeServer {
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
-                        "name": { 
-                            "type": "string", 
-                            "description": "知识库名称，长度不超过100个字符" 
+                        "name": {
+                            "type": "string",
+                            "description": "知识库名称，长度不超过100个字符"
                         },
-                        "space_id": { 
-                            "type": "string", 
-                            "description": "知识库所在空间的唯一标识（可选，使用默认space_id）" 
+                        "space_id": {
+                            "type": "string",
+                            "description": "知识库所在空间的唯一标识（可选，使用默认space_id）"
                         },
-                        "format_type": { 
-                            "type": "number", 
+                        "format_type": {
+                            "type": "number",
                             "enum": [0, 2],
-                            "description": "知识库类型：0-文本类型，2-图片类型" 
+                            "description": "知识库类型：0-文本类型，2-图片类型"
                         },
-                        "description": { 
-                            "type": "string", 
-                            "description": "知识库描述信息（可选）" 
+                        "description": {
+                            "type": "string",
+                            "description": "知识库描述信息（可选）"
                         },
-                        "file_id": { 
-                            "type": "string", 
-                            "description": "知识库图标文件ID（可选），需通过【上传文件】API获取" 
+                        "file_id": {
+                            "type": "string",
+                            "description": "知识库图标文件ID（可选），需通过【上传文件】API获取"
                         }
                     },
                     "required": ["name", "format_type"]
@@ -223,8 +220,8 @@ impl ServerHandler for CozeServer {
                         "message": { "type": "string", "description": "要发送的消息内容（必填）" },
                         "user_id": { "type": "string", "description": "用户ID（可选）" },
                         "conversation_id": { "type": "string", "description": "对话ID（可选，不提供则创建新对话）" },
-                        "custom_variables": { 
-                            "type": "object", 
+                        "custom_variables": {
+                            "type": "object",
                             "description": "自定义变量（可选）",
                             "additionalProperties": { "type": "string" }
                         }
@@ -245,8 +242,8 @@ impl ServerHandler for CozeServer {
                         "message": { "type": "string", "description": "要发送的消息内容（必填）" },
                         "user_id": { "type": "string", "description": "用户ID（可选）" },
                         "conversation_id": { "type": "string", "description": "对话ID（可选，不提供则创建新对话）" },
-                        "custom_variables": { 
-                            "type": "object", 
+                        "custom_variables": {
+                            "type": "object",
                             "description": "自定义变量（可选）",
                             "additionalProperties": { "type": "string" }
                         }
