@@ -1,6 +1,6 @@
 [package]
 name = "coze-mcp-server"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 authors = ["Coze MCP Team"]
 description = "Coze Platform MCP Server Implementation"
