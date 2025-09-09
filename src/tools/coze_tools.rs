@@ -67,7 +67,7 @@ impl CozeTools {
             .list_datasets(&space_id, None, None, None, None)
             .await
         {
-            Ok(mut result) => {
+            Ok(result) => {
                 // Optional: refine document_count by fetching dataset detail (limited to first 50 to avoid many requests)
                 let content = if result.datasets.is_empty() {
                     "没有找到知识库".to_string()
