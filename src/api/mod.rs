@@ -90,7 +90,7 @@ pub struct KnowledgeBaseInfo {
     pub description: String,
     #[serde(rename = "create_time")]
     pub created_at: i64,
-    #[serde(rename = "doc_count")]
+    #[serde(rename = "doc_count", default)]
     pub document_count: usize,
     // ---- Extended optional fields from official API (list_dataset) ----
     #[serde(rename = "update_time", skip_serializing_if = "Option::is_none")]
