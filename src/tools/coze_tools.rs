@@ -1,6 +1,6 @@
 use crate::api::CozeApiClient;
-use futures::stream::{self, StreamExt};
 use crate::models::{CozeApiRequest, HttpMethod};
+use futures::stream::{self, StreamExt};
 use rmcp::model::CallToolResult;
 use rmcp::ErrorData as McpError;
 use serde_json::{json, Value};
@@ -95,10 +95,13 @@ impl CozeTools {
                 // The datasets endpoint may report zero while documents already exist.
                 // Verify zero counts through the official document/list endpoint; unsupported
                 // dataset types fall back to the list value instead of inventing a count.
-                let dataset_keys: Vec<(String, usize)> = result.datasets.iter()
+                let dataset_keys: Vec<(String, usize)> = result
+                    .datasets
+                    .iter()
                     .map(|kb| (kb.dataset_id.clone(), kb.document_count))
                     .collect();
-                let refresh_targets = document_count_refresh_targets(&dataset_keys, accurate_counts);
+                let refresh_targets =
+                    document_count_refresh_targets(&dataset_keys, accurate_counts);
                 let refresh_indices: std::collections::HashSet<usize> =
                     refresh_targets.iter().map(|(index, _)| *index).collect();
                 let mut count_sources = vec!["dataset_list".to_string(); result.datasets.len()];
@@ -114,16 +117,17 @@ impl CozeTools {
                     }
                 }
                 let client = Arc::clone(&self.coze_client);
-                let refresh_results = stream::iter(refresh_targets.into_iter().map(|(index, dataset_id)| {
-                    let client = Arc::clone(&client);
-                    async move {
-                        let result = client.count_knowledge_documents(&dataset_id).await;
-                        (index, dataset_id, result)
-                    }
-                }))
-                .buffer_unordered(DOCUMENT_COUNT_REFRESH_CONCURRENCY)
-                .collect::<Vec<_>>()
-                .await;
+                let refresh_results =
+                    stream::iter(refresh_targets.into_iter().map(|(index, dataset_id)| {
+                        let client = Arc::clone(&client);
+                        async move {
+                            let result = client.count_knowledge_documents(&dataset_id).await;
+                            (index, dataset_id, result)
+                        }
+                    }))
+                    .buffer_unordered(DOCUMENT_COUNT_REFRESH_CONCURRENCY)
+                    .collect::<Vec<_>>()
+                    .await;
 
                 let mut count_refresh_errors = 0usize;
                 for (index, dataset_id, count_result) in refresh_results {
@@ -143,7 +147,9 @@ impl CozeTools {
                         }
                     }
                 }
-                let count_refresh_truncated = count_sources.iter().any(|source| source == "refresh_limit_reached");
+                let count_refresh_truncated = count_sources
+                    .iter()
+                    .any(|source| source == "refresh_limit_reached");
                 let content = if result.datasets.is_empty() {
                     "没有找到知识库".to_string()
                 } else {
@@ -168,7 +174,9 @@ impl CozeTools {
                         ));
                     }
                     if count_refresh_truncated {
-                        response.push_str("提示：文档数为 0 的知识库超过 50 个，仅前 50 个完成二次核验。\n");
+                        response.push_str(
+                            "提示：文档数为 0 的知识库超过 50 个，仅前 50 个完成二次核验。\n",
+                        );
                     }
                     response
                 };
@@ -1200,7 +1208,6 @@ impl CozeTools {
         }
     }
 }
-
 
 #[cfg(test)]
 mod document_count_refresh_tests {
