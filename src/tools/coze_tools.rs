@@ -168,7 +168,7 @@ impl CozeTools {
                             "name": kb.name,
                             "description": kb.description,
                             "document_count": kb.document_count,
-                            "document_count_source": count_sources[index],
+                            "document_count_source": count_sources[index].as_str(),
                             "created_at": kb.created_at,
                             "update_time": kb.update_time,
                             "status": kb.status,
@@ -1184,5 +1184,38 @@ impl CozeTools {
                 })
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod document_count_refresh_tests {
+    use super::*;
+
+    #[test]
+    fn refresh_targets_only_zero_counts_and_caps_at_fifty() {
+        let mut datasets = Vec::new();
+        for index in 0..60 {
+            let count = if index % 3 == 0 { 4 } else { 0 };
+            datasets.push((format!("dataset-{index}"), count));
+        }
+        let targets = document_count_refresh_targets(&datasets, true);
+        assert_eq!(targets.len(), DOCUMENT_COUNT_REFRESH_LIMIT);
+        assert!(targets.iter().all(|(index, _)| datasets[*index].1 == 0));
+        assert!(targets.iter().all(|(_, dataset_id)| !dataset_id.is_empty()));
+    }
+
+    #[test]
+    fn refresh_skips_empty_ids_and_can_be_disabled() {
+        let datasets = vec![
+            (String::new(), 0),
+            ("has-docs".to_string(), 5),
+            ("empty-count".to_string(), 0),
+        ];
+        assert_eq!(
+            document_count_refresh_targets(&datasets, true),
+            vec![(2, "empty-count".to_string())]
+        );
+        assert!(document_count_refresh_targets(&datasets, false).is_empty());
     }
 }
