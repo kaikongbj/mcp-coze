@@ -121,7 +121,7 @@
     - description: 知识库描述
   - 验证结论：已验证（CN）
 
-### 已验证的知识库文档列表/计数 API
+### 官方接口契约已核对：知识库文档列表/计数 API
 
 - 能力：按知识库 ID 获取文档列表及总数
 - 方法与路径：POST `https://api.coze.cn/open_api/knowledge/document/list`
@@ -131,7 +131,8 @@
 - `total` 是文件列表接口返回的文档总数；解析同时兼容 JSON number 与 numeric string
 - `list_knowledge_bases` 默认仅对 datasets 列表中 `doc_count=0` 的条目进行二次核验，最多 50 个、并发 5；非 Coze 数据集或接口失败时保留原列表值并标记 `document_count_source=dataset_list_unverified`
 - 官方文档：<https://docs.coze.cn/developer_guides_list_knowledge_files>
-- 验证测试：`src/api/client.rs::document_list_count_tests`
+- 本地契约/HTTP 模拟测试：`src/api/client.rs::document_list_count_tests`
+- 验收状态：官方文档已核对；真实账号联调待执行
 
 ### 待验证的知识库API
 
