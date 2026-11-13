@@ -53,7 +53,7 @@ Coze MCP Server 是一个专门为中国区Coze平台设计的MCP服务器，完
 - `list_bots` - 列出 Bots
 
 ### 4. 知识库管理
-- `list_knowledge_bases` - 列出所有知识库
+- `list_knowledge_bases` - 列出知识库；默认对列表接口返回 0 的文档数调用官方文件列表接口核验（最多 50 个），可传 `accurate_counts: false` 关闭
 - `create_knowledge_base_v2` - 创建知识库
 - `upload_document_to_knowledge_base` - 上传本地文档到知识库
 
@@ -107,7 +107,8 @@ Coze MCP Server 是一个专门为中国区Coze平台设计的MCP服务器，完
   "params": {
     "name": "list_knowledge_bases",
     "arguments": {
-      "space_id": "your_space_id"
+      "space_id": "your_space_id",
+      "accurate_counts": true
     }
   }
 }
