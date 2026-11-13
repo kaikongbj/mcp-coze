@@ -126,8 +126,8 @@ impl CozeTools {
                 .await;
 
                 let mut count_refresh_errors = 0usize;
-                for (index, dataset_id, result) in refresh_results {
-                    match result {
+                for (index, dataset_id, count_result) in refresh_results {
+                    match count_result {
                         Ok(count) => {
                             result.datasets[index].document_count = count;
                             count_sources[index] = "document_list".to_string();
