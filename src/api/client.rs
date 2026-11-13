@@ -874,4 +874,37 @@ mod document_list_count_tests {
             Err(ApiError::InvalidResponseFormat(_))
         ));
     }
+
+    #[tokio::test]
+    async fn count_method_posts_to_document_list_with_small_page() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buffer = vec![0_u8; 8192];
+            let size = socket.read(&mut buffer).await.unwrap();
+            let request = String::from_utf8_lossy(&buffer[..size]);
+            assert!(request.starts_with("POST /open_api/knowledge/document/list HTTP/1.1"));
+            assert!(request.to_ascii_lowercase().contains("agw-js-conv: str"));
+            assert!(request.contains("\"dataset_id\":\"ds_test\""));
+            assert!(request.contains("\"page\":1"));
+            assert!(request.contains("\"size\":1"));
+
+            let body = r#"{\"code\":0,\"document_infos\":[],\"total\":17}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
+        });
+
+        let client = CozeApiClient::new(format!("http://{address}"), "test-token".to_string()).unwrap();
+        let count = client.count_knowledge_documents("ds_test").await.unwrap();
+        assert_eq!(count, 17);
+        server.await.unwrap();
+    }
 }
