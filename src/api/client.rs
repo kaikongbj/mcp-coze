@@ -5,6 +5,73 @@ use reqwest::{Client, Response};
 use std::time::Duration;
 use urlencoding::encode;
 
+fn json_integer_as_u64(value: &serde_json::Value) -> Option<u64> {
+    match value {
+        serde_json::Value::Number(number) => number.as_u64(),
+        serde_json::Value::String(text) => text.trim().parse::<u64>().ok(),
+        _ => None,
+    }
+}
+
+fn json_integer_as_i64(value: &serde_json::Value) -> Option<i64> {
+    match value {
+        serde_json::Value::Number(number) => number.as_i64(),
+        serde_json::Value::String(text) => text.trim().parse::<i64>().ok(),
+        _ => None,
+    }
+}
+
+/// Parse the documented document-list response. Coze returns top-level total;
+/// accept a data wrapper as a forward-compatible variant and numeric strings
+/// because Agw-Js-Conv may serialize 64-bit values as strings.
+fn parse_knowledge_document_list_count(raw: &serde_json::Value) -> Result<usize, ApiError> {
+    let code = raw
+        .get("code")
+        .and_then(json_integer_as_i64)
+        .ok_or_else(|| {
+            ApiError::InvalidResponseFormat(ApiErrorData::new(
+                "document_list",
+                "Response is missing a valid code field".to_string(),
+                None,
+                Some(raw.to_string()),
+            ))
+        })?;
+    if code != 0 {
+        let message = raw
+            .get("msg")
+            .and_then(|value| value.as_str())
+            .unwrap_or("Coze document-list API returned a non-zero code");
+        return Err(ApiError::BadRequest(ApiErrorData::new(
+            "document_list",
+            format!("Coze document-list API code={code}: {message}"),
+            Some(200),
+            Some(raw.to_string()),
+        )));
+    }
+
+    let data = raw.get("data").unwrap_or(raw);
+    let total = data
+        .get("total")
+        .or_else(|| raw.get("total"))
+        .and_then(json_integer_as_u64)
+        .ok_or_else(|| {
+            ApiError::InvalidResponseFormat(ApiErrorData::new(
+                "document_list",
+                "Successful response is missing a numeric total field".to_string(),
+                None,
+                Some(raw.to_string()),
+            ))
+        })?;
+    usize::try_from(total).map_err(|_| {
+        ApiError::InvalidResponseFormat(ApiErrorData::new(
+            "document_list",
+            format!("Document total {total} exceeds this platform's usize range"),
+            None,
+            Some(raw.to_string()),
+        ))
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct CozeApiClient {
     client: Client,
@@ -190,6 +257,31 @@ impl CozeApiClient {
         );
         let resp = self.send_raw_request("GET", &url, None).await?;
         self.process_response(resp).await
+    }
+
+    /// Count documents in a Coze knowledge base using the official document-list endpoint.
+    /// Requesting one row keeps the response small; the API's total is the authoritative count.
+    pub async fn count_knowledge_documents(&self, dataset_id: &str) -> Result<usize, ApiError> {
+        use crate::api::endpoints::KNOWLEDGE_DOCUMENT_LIST_URL;
+
+        let url = format!(
+            "{}{}",
+            self.base_url.trim_end_matches('/'),
+            KNOWLEDGE_DOCUMENT_LIST_URL
+        );
+        let payload = serde_json::json!({
+            "dataset_id": dataset_id,
+            "page": 1,
+            "size": 1,
+        });
+        let response = self.send_raw_request("POST", &url, Some(payload)).await?;
+        let status = response.status();
+        let body = response.text().await?;
+        if !status.is_success() {
+            return Err(ApiError::from_response(status, body));
+        }
+        let raw: serde_json::Value = serde_json::from_str(&body).map_err(ApiError::from)?;
+        parse_knowledge_document_list_count(&raw)
     }
 
     // retrieve_conversation_v1 & get_conversation_messages_v3 removed (not used)
@@ -747,5 +839,107 @@ impl CozeApiClient {
             .unwrap_or(&empty_array);
 
         serde_json::from_value(messages.clone()).map_err(ApiError::from)
+    }
+}
+
+#[cfg(test)]
+mod document_list_count_tests {
+    use super::*;
+
+    #[test]
+    fn parses_official_top_level_numeric_total() {
+        let response = serde_json::json!({
+            "code": 0,
+            "msg": "",
+            "document_infos": [{"document_id": "doc-1"}],
+            "total": 27
+        });
+        assert_eq!(parse_knowledge_document_list_count(&response).unwrap(), 27);
+    }
+
+    #[test]
+    fn parses_numeric_string_total_and_nested_wrapper() {
+        let response = serde_json::json!({
+            "code": "0",
+            "data": { "total": "123" }
+        });
+        assert_eq!(parse_knowledge_document_list_count(&response).unwrap(), 123);
+    }
+
+    #[test]
+    fn rejects_nonzero_api_code_instead_of_reporting_zero() {
+        let response = serde_json::json!({
+            "code": 4001,
+            "msg": "dataset type is not supported",
+            "total": 0
+        });
+        let error = parse_knowledge_document_list_count(&response).unwrap_err();
+        assert!(error.to_string().contains("4001"));
+        assert!(error.to_string().contains("not supported"));
+    }
+
+    #[test]
+    fn rejects_success_without_total_instead_of_reporting_zero() {
+        let response = serde_json::json!({ "code": 0, "document_infos": [] });
+        assert!(matches!(
+            parse_knowledge_document_list_count(&response),
+            Err(ApiError::InvalidResponseFormat(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn count_method_posts_to_document_list_with_small_page() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request_bytes = Vec::new();
+            loop {
+                let mut chunk = [0_u8; 1024];
+                let size = socket.read(&mut chunk).await.unwrap();
+                if size == 0 {
+                    break;
+                }
+                request_bytes.extend_from_slice(&chunk[..size]);
+                let request_text = String::from_utf8_lossy(&request_bytes);
+                if let Some(header_end) = request_text.find("\r\n\r\n") {
+                    let content_length = request_text[..header_end]
+                        .lines()
+                        .find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse::<usize>().ok())
+                                .flatten()
+                        })
+                        .unwrap_or(0);
+                    if request_bytes.len() >= header_end + 4 + content_length {
+                        break;
+                    }
+                }
+            }
+            let request = String::from_utf8_lossy(&request_bytes);
+            assert!(request.starts_with("POST /open_api/knowledge/document/list HTTP/1.1"));
+            assert!(request.to_ascii_lowercase().contains("agw-js-conv: str"));
+            assert!(request.contains("\"dataset_id\":\"ds_test\""));
+            assert!(request.contains("\"page\":1"));
+            assert!(request.contains("\"size\":1"));
+
+            let body = r#"{"code":0,"document_infos":[],"total":17}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
+        });
+
+        let client =
+            CozeApiClient::new(format!("http://{address}"), "test-token".to_string()).unwrap();
+        let count = client.count_knowledge_documents("ds_test").await.unwrap();
+        assert_eq!(count, 17);
+        server.await.unwrap();
     }
 }

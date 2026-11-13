@@ -28,6 +28,7 @@ pub mod chat {
 }
 
 // Chat completion endpoints removed (unused)
-pub const KNOWLEDGE_DOCUMENT_CREATE_URL: &str = "/open_api/knowledge/document/create"; // (legacy upload removed; retain if tool layer still references)
+pub const KNOWLEDGE_DOCUMENT_CREATE_URL: &str = "/open_api/knowledge/document/create";
+pub const KNOWLEDGE_DOCUMENT_LIST_URL: &str = "/open_api/knowledge/document/list"; // (legacy upload removed; retain if tool layer still references)
 
 // Removed unused request/response structs

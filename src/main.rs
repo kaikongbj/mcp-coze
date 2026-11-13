@@ -129,11 +129,16 @@ impl ServerHandler for CozeServer {
             // 2. 知识库管理 - 核心功能
             Tool {
                 name: "list_knowledge_bases".into(),
-                description: Some("列出所有知识库".into()),
+                description: Some("列出知识库；默认对文档数为 0 的条目进行文件列表二次核验（最多 50 个）".into()),
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "space_id": { "type": "string", "description": "空间ID (可选，使用默认space_id)" },
+                        "accurate_counts": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "对列表接口返回 0 的文档数使用官方 document/list 接口二次核验；默认开启，最多核验 50 个知识库"
+                        }
                     },
                     "required": []
                 }).as_object().unwrap().clone()),
