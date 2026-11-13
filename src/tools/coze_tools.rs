@@ -161,13 +161,14 @@ impl CozeTools {
                 let sc_items: Vec<Value> = result
                     .datasets
                     .iter()
-                    .map(|kb| {
+                    .enumerate()
+                    .map(|(index, kb)| {
                         json!({
                             "dataset_id": kb.dataset_id,
                             "name": kb.name,
                             "description": kb.description,
                             "document_count": kb.document_count,
-                            "document_count_source": count_sources[sc_items.len()],
+                            "document_count_source": count_sources[index],
                             "created_at": kb.created_at,
                             "update_time": kb.update_time,
                             "status": kb.status,
