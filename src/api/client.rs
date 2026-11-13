@@ -255,7 +255,7 @@ impl CozeApiClient {
     pub async fn count_knowledge_documents(&self, dataset_id: &str) -> Result<usize, ApiError> {
         use crate::api::endpoints::KNOWLEDGE_DOCUMENT_LIST_URL;
 
-        let url = format!("{}{}", self.base_url, KNOWLEDGE_DOCUMENT_LIST_URL);
+        let url = format!("{}{}", self.base_url.trim_end_matches('/'), KNOWLEDGE_DOCUMENT_LIST_URL);
         let payload = serde_json::json!({
             "dataset_id": dataset_id,
             "page": 1,
@@ -884,9 +884,31 @@ mod document_list_count_tests {
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
             let (mut socket, _) = listener.accept().await.unwrap();
-            let mut buffer = vec![0_u8; 8192];
-            let size = socket.read(&mut buffer).await.unwrap();
-            let request = String::from_utf8_lossy(&buffer[..size]);
+            let mut request_bytes = Vec::new();
+            loop {
+                let mut chunk = [0_u8; 1024];
+                let size = socket.read(&mut chunk).await.unwrap();
+                if size == 0 {
+                    break;
+                }
+                request_bytes.extend_from_slice(&chunk[..size]);
+                let request_text = String::from_utf8_lossy(&request_bytes);
+                if let Some(header_end) = request_text.find("\r\n\r\n") {
+                    let content_length = request_text[..header_end]
+                        .lines()
+                        .find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse::<usize>().ok())
+                                .flatten()
+                        })
+                        .unwrap_or(0);
+                    if request_bytes.len() >= header_end + 4 + content_length {
+                        break;
+                    }
+                }
+            }
+            let request = String::from_utf8_lossy(&request_bytes);
             assert!(request.starts_with("POST /open_api/knowledge/document/list HTTP/1.1"));
             assert!(request.to_ascii_lowercase().contains("agw-js-conv: str"));
             assert!(request.contains("\"dataset_id\":\"ds_test\""));
