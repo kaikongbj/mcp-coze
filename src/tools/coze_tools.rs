@@ -6,6 +6,24 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid;
 
+const DOCUMENT_COUNT_REFRESH_LIMIT: usize = 50;
+
+fn document_count_refresh_targets(
+    datasets: &[(String, usize)],
+    accurate_counts: bool,
+) -> Vec<(usize, String)> {
+    if !accurate_counts {
+        return Vec::new();
+    }
+    datasets
+        .iter()
+        .enumerate()
+        .filter(|(_, (dataset_id, document_count))| !dataset_id.is_empty() && *document_count == 0)
+        .take(DOCUMENT_COUNT_REFRESH_LIMIT)
+        .map(|(index, (dataset_id, _))| (index, dataset_id.clone()))
+        .collect()
+}
+
 #[derive(Debug, Clone)]
 pub struct CozeTools {
     coze_client: Arc<CozeApiClient>,
@@ -49,6 +67,10 @@ impl CozeTools {
         args: Option<Value>,
     ) -> Result<CallToolResult, McpError> {
         let args = args.unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+        let accurate_counts = args
+            .get("accurate_counts")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
         let space_id = args
             .get("space_id")
             .and_then(|v| v.as_str())
@@ -68,21 +90,71 @@ impl CozeTools {
             .await
         {
             Ok(mut result) => {
-                // Optional: refine document_count by fetching dataset detail (limited to first 50 to avoid many requests)
+                // The datasets endpoint may report zero while documents already exist.
+                // Verify zero counts through the official document/list endpoint; unsupported
+                // dataset types fall back to the list value instead of inventing a count.
+                let dataset_keys: Vec<(String, usize)> = result.datasets.iter()
+                    .map(|kb| (kb.dataset_id.clone(), kb.document_count))
+                    .collect();
+                let refresh_targets = document_count_refresh_targets(&dataset_keys, accurate_counts);
+                let refresh_indices: std::collections::HashSet<usize> =
+                    refresh_targets.iter().map(|(index, _)| *index).collect();
+                let mut count_sources = vec!["dataset_list".to_string(); result.datasets.len()];
+                for (index, kb) in result.datasets.iter().enumerate() {
+                    if accurate_counts && kb.document_count == 0 {
+                        count_sources[index] = if kb.dataset_id.is_empty() {
+                            "unverified_missing_dataset_id".to_string()
+                        } else if refresh_indices.contains(&index) {
+                            "pending_document_list".to_string()
+                        } else {
+                            "refresh_limit_reached".to_string()
+                        };
+                    }
+                }
+                let mut count_refresh_errors = 0usize;
+                for (index, dataset_id) in refresh_targets {
+                    match self.coze_client.count_knowledge_documents(&dataset_id).await {
+                        Ok(count) => {
+                            result.datasets[index].document_count = count;
+                            count_sources[index] = "document_list".to_string();
+                        }
+                        Err(error) => {
+                            count_refresh_errors += 1;
+                            count_sources[index] = "dataset_list_unverified".to_string();
+                            tracing::warn!(
+                                dataset_id = %dataset_id,
+                                error = %error,
+                                "Unable to verify knowledge-base document count; preserving datasets-list value"
+                            );
+                        }
+                    }
+                }
+                let count_refresh_truncated = count_sources.iter().any(|source| source == "refresh_limit_reached");
                 let content = if result.datasets.is_empty() {
                     "没有找到知识库".to_string()
                 } else {
                     let mut response = format!("找到 {} 个知识库:\n\n", result.total);
                     for (i, kb) in result.datasets.iter().enumerate() {
+                        let count_note = match count_sources[i].as_str() {
+                            "document_list" => "（文件列表核验）",
+                            "dataset_list_unverified" => "（未能独立核验，保留列表值）",
+                            "refresh_limit_reached" => "（超过核验上限，保留列表值）",
+                            "unverified_missing_dataset_id" => "（缺少 dataset_id，未能核验）",
+                            _ => "",
+                        };
                         response.push_str(&format!(
-                            "{}. ID: {}\n   名称: {}\n   描述: {}\n   文档数量: {}\n   创建时间: {}\n\n",
+                            "{}. ID: {}\n   名称: {}\n   描述: {}\n   文档数量: {} {}\n   创建时间: {}\n\n",
                             i + 1,
                             kb.dataset_id,
                             kb.name,
                             kb.description,
                             kb.document_count,
+                            count_note,
                             kb.created_at
                         ));
+                    }
+                    if count_refresh_truncated {
+                        response.push_str("提示：文档数为 0 的知识库超过 50 个，仅前 50 个完成二次核验。\n");
                     }
                     response
                 };
@@ -95,6 +167,7 @@ impl CozeTools {
                             "name": kb.name,
                             "description": kb.description,
                             "document_count": kb.document_count,
+                            "document_count_source": count_sources[sc_items.len()],
                             "created_at": kb.created_at,
                             "update_time": kb.update_time,
                             "status": kb.status,
@@ -122,7 +195,14 @@ impl CozeTools {
                         })
                     })
                     .collect();
-                let structured = json!({ "total": result.total,  "items": sc_items });
+                let structured = json!({
+                    "total": result.total,
+                    "accurate_counts_requested": accurate_counts,
+                    "document_count_refresh_limit": DOCUMENT_COUNT_REFRESH_LIMIT,
+                    "document_count_refresh_truncated": count_refresh_truncated,
+                    "document_count_refresh_errors": count_refresh_errors,
+                    "items": sc_items
+                });
 
                 Ok(CallToolResult {
                     content: Some(vec![rmcp::model::Content::text(content)]),
