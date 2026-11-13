@@ -1210,7 +1210,7 @@ mod document_count_refresh_tests {
     fn refresh_targets_only_zero_counts_and_caps_at_fifty() {
         let mut datasets = Vec::new();
         for index in 0..60 {
-            let count = if index % 3 == 0 { 4 } else { 0 };
+            let count = if index < 5 { 4 } else { 0 };
             datasets.push((format!("dataset-{index}"), count));
         }
         let targets = document_count_refresh_targets(&datasets, true);
