@@ -893,7 +893,7 @@ mod document_list_count_tests {
             assert!(request.contains("\"page\":1"));
             assert!(request.contains("\"size\":1"));
 
-            let body = r#"{\"code\":0,\"document_infos\":[],\"total\":17}"#;
+            let body = r#"{"code":0,"document_infos":[],"total":17}"#;
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 body.len(),
