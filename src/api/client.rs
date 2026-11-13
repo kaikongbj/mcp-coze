@@ -28,14 +28,19 @@ fn parse_knowledge_document_list_count(raw: &serde_json::Value) -> Result<usize,
     let code = raw
         .get("code")
         .and_then(json_integer_as_i64)
-        .ok_or_else(|| ApiError::InvalidResponseFormat(ApiErrorData::new(
-            "document_list",
-            "Response is missing a valid code field".to_string(),
-            None,
-            Some(raw.to_string()),
-        )))?;
+        .ok_or_else(|| {
+            ApiError::InvalidResponseFormat(ApiErrorData::new(
+                "document_list",
+                "Response is missing a valid code field".to_string(),
+                None,
+                Some(raw.to_string()),
+            ))
+        })?;
     if code != 0 {
-        let message = raw.get("msg").and_then(|value| value.as_str()).unwrap_or("Coze document-list API returned a non-zero code");
+        let message = raw
+            .get("msg")
+            .and_then(|value| value.as_str())
+            .unwrap_or("Coze document-list API returned a non-zero code");
         return Err(ApiError::BadRequest(ApiErrorData::new(
             "document_list",
             format!("Coze document-list API code={code}: {message}"),
@@ -49,18 +54,22 @@ fn parse_knowledge_document_list_count(raw: &serde_json::Value) -> Result<usize,
         .get("total")
         .or_else(|| raw.get("total"))
         .and_then(json_integer_as_u64)
-        .ok_or_else(|| ApiError::InvalidResponseFormat(ApiErrorData::new(
+        .ok_or_else(|| {
+            ApiError::InvalidResponseFormat(ApiErrorData::new(
+                "document_list",
+                "Successful response is missing a numeric total field".to_string(),
+                None,
+                Some(raw.to_string()),
+            ))
+        })?;
+    usize::try_from(total).map_err(|_| {
+        ApiError::InvalidResponseFormat(ApiErrorData::new(
             "document_list",
-            "Successful response is missing a numeric total field".to_string(),
+            format!("Document total {total} exceeds this platform's usize range"),
             None,
             Some(raw.to_string()),
-        )))?;
-    usize::try_from(total).map_err(|_| ApiError::InvalidResponseFormat(ApiErrorData::new(
-        "document_list",
-        format!("Document total {total} exceeds this platform's usize range"),
-        None,
-        Some(raw.to_string()),
-    )))
+        ))
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -255,7 +264,11 @@ impl CozeApiClient {
     pub async fn count_knowledge_documents(&self, dataset_id: &str) -> Result<usize, ApiError> {
         use crate::api::endpoints::KNOWLEDGE_DOCUMENT_LIST_URL;
 
-        let url = format!("{}{}", self.base_url.trim_end_matches('/'), KNOWLEDGE_DOCUMENT_LIST_URL);
+        let url = format!(
+            "{}{}",
+            self.base_url.trim_end_matches('/'),
+            KNOWLEDGE_DOCUMENT_LIST_URL
+        );
         let payload = serde_json::json!({
             "dataset_id": dataset_id,
             "page": 1,
@@ -829,7 +842,6 @@ impl CozeApiClient {
     }
 }
 
-
 #[cfg(test)]
 mod document_list_count_tests {
     use super::*;
@@ -924,7 +936,8 @@ mod document_list_count_tests {
             socket.write_all(response.as_bytes()).await.unwrap();
         });
 
-        let client = CozeApiClient::new(format!("http://{address}"), "test-token".to_string()).unwrap();
+        let client =
+            CozeApiClient::new(format!("http://{address}"), "test-token".to_string()).unwrap();
         let count = client.count_knowledge_documents("ds_test").await.unwrap();
         assert_eq!(count, 17);
         server.await.unwrap();
