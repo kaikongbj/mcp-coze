@@ -52,7 +52,7 @@ cargo build --release
 | set_api_key | 设置 / 更新 API Key |
 | list_workspaces | 列出工作空间 |
 | list_bots | 列出 Bots（支持分页） |
-| list_knowledge_bases | 列出知识库（支持名称过滤、分页、文档数量精确刷新） |
+| list_knowledge_bases | 列出知识库；默认对列表值为 0 的文档数二次核验（最多 50 个，支持关闭） |
 | create_knowledge_base_v2 | 创建知识库（支持 permission=private/public） |
 | upload_document_to_knowledge_base | 上传本地文件到知识库（<=10MB 示例限制） |
 | list_conversations | 按 bot_id 列出会话 |
