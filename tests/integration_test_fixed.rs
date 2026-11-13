@@ -22,8 +22,7 @@ async fn test_real_api_integration() {
         println!("⏭️ 跳过真实 API 集成测试：未设置 COZE_SPACE_ID");
         return;
     };
-    let base_url = env::var("COZE_BASE_URL")
-        .unwrap_or_else(|_| "https://api.coze.cn".to_string());
+    let base_url = env::var("COZE_BASE_URL").unwrap_or_else(|_| "https://api.coze.cn".to_string());
 
     println!("✅ 真实 API 测试配置已从环境变量读取");
     println!("   Base URL: {}", base_url);
