@@ -6,14 +6,26 @@ use std::env;
 async fn test_real_api_integration() {
     println!("🧪 开始真实API集成测试...");
 
-    // 直接设置API密钥和参数
-    let api_token =
-        "pat_8NU7DXjMPg4O7rg4tbt8ZYzKkHRIMTZ8SKANbdYdjf0vMPKR7CbKsn0biE9TKcDi".to_string();
-    let base_url = "https://api.coze.cn".to_string();
-    let space_id = "7409828301432356875".to_string();
+    // Real-account verification is opt-in. Never commit or print credentials.
+    let api_token = env::var("COZE_API_TOKEN")
+        .or_else(|_| env::var("COZE_API_KEY"))
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let Some(api_token) = api_token else {
+        println!("⏭️ 跳过真实 API 集成测试：未设置 COZE_API_TOKEN / COZE_API_KEY");
+        return;
+    };
+    let space_id = env::var("COZE_SPACE_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let Some(space_id) = space_id else {
+        println!("⏭️ 跳过真实 API 集成测试：未设置 COZE_SPACE_ID");
+        return;
+    };
+    let base_url = env::var("COZE_BASE_URL")
+        .unwrap_or_else(|_| "https://api.coze.cn".to_string());
 
-    println!("✅ API配置已设置");
-    println!("   API Token: {}...", &api_token[..10]);
+    println!("✅ 真实 API 测试配置已从环境变量读取");
     println!("   Base URL: {}", base_url);
     println!("   Space ID: {}", space_id);
 
