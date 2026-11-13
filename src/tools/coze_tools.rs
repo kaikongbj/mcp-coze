@@ -1,4 +1,5 @@
 use crate::api::CozeApiClient;
+use futures::stream::{self, StreamExt};
 use crate::models::{CozeApiRequest, HttpMethod};
 use rmcp::model::CallToolResult;
 use rmcp::ErrorData as McpError;
@@ -7,6 +8,7 @@ use std::sync::Arc;
 use uuid;
 
 const DOCUMENT_COUNT_REFRESH_LIMIT: usize = 50;
+const DOCUMENT_COUNT_REFRESH_CONCURRENCY: usize = 5;
 
 fn document_count_refresh_targets(
     datasets: &[(String, usize)],
@@ -111,9 +113,21 @@ impl CozeTools {
                         };
                     }
                 }
+                let client = Arc::clone(&self.coze_client);
+                let refresh_results = stream::iter(refresh_targets.into_iter().map(|(index, dataset_id)| {
+                    let client = Arc::clone(&client);
+                    async move {
+                        let result = client.count_knowledge_documents(&dataset_id).await;
+                        (index, dataset_id, result)
+                    }
+                }))
+                .buffer_unordered(DOCUMENT_COUNT_REFRESH_CONCURRENCY)
+                .collect::<Vec<_>>()
+                .await;
+
                 let mut count_refresh_errors = 0usize;
-                for (index, dataset_id) in refresh_targets {
-                    match self.coze_client.count_knowledge_documents(&dataset_id).await {
+                for (index, dataset_id, result) in refresh_results {
+                    match result {
                         Ok(count) => {
                             result.datasets[index].document_count = count;
                             count_sources[index] = "document_list".to_string();
