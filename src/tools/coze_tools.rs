@@ -1,6 +1,6 @@
 use crate::api::CozeApiClient;
 use crate::models::{CozeApiRequest, HttpMethod};
-use rmcp::model::CallToolResult;
+use crate::compat::CallToolResult;
 use rmcp::ErrorData as McpError;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -125,7 +125,7 @@ impl CozeTools {
                 let structured = json!({ "total": result.total,  "items": sc_items });
 
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(content)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(content)]),
                     is_error: Some(false),
                     structured_content: Some(structured),
                 })
@@ -134,7 +134,7 @@ impl CozeTools {
                 let serialized =
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(format!(
+                    content: Some(vec![rmcp::model::ContentBlock::text(format!(
                         "获取知识库列表失败: {e}"
                     ))]),
                     is_error: Some(true),
@@ -238,7 +238,7 @@ impl CozeTools {
                 });
 
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(out)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(out)]),
                     is_error: Some(false),
                     structured_content: Some(structured),
                 })
@@ -247,7 +247,7 @@ impl CozeTools {
                 let serialized =
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(format!(
+                    content: Some(vec![rmcp::model::ContentBlock::text(format!(
                         "[Bots] 请求失败: {e}"
                     ))]),
                     is_error: Some(true),
@@ -282,7 +282,7 @@ impl CozeTools {
                     }
                 }
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(out)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(out)]),
                     is_error: Some(false),
                     structured_content: Some(json!({"total": total, "items": sc_items})),
                 })
@@ -291,7 +291,7 @@ impl CozeTools {
                 let serialized =
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(format!(
+                    content: Some(vec![rmcp::model::ContentBlock::text(format!(
                         "[Workspaces] 请求失败: {e}"
                     ))]),
                     is_error: Some(true),
@@ -319,7 +319,7 @@ impl CozeTools {
             Some(args) => args,
             None => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text("Missing arguments")]),
+                    content: Some(vec![rmcp::model::ContentBlock::text("Missing arguments")]),
                     is_error: Some(true),
                     structured_content: Some(json!({
                         "success": false,
@@ -333,7 +333,7 @@ impl CozeTools {
             Some(name) => name,
             None => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text("Missing name parameter")]),
+                    content: Some(vec![rmcp::model::ContentBlock::text("Missing name parameter")]),
                     is_error: Some(true),
                     structured_content: Some(json!({
                         "success": false,
@@ -345,7 +345,7 @@ impl CozeTools {
 
         if name.len() > 100 {
             return Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text(
+                content: Some(vec![rmcp::model::ContentBlock::text(
                     "Name length cannot exceed 100 characters",
                 )]),
                 is_error: Some(true),
@@ -368,7 +368,7 @@ impl CozeTools {
             Some(space_id) => space_id,
             None => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(
+                    content: Some(vec![rmcp::model::ContentBlock::text(
                         "Missing space_id parameter",
                     )]),
                     is_error: Some(true),
@@ -388,7 +388,7 @@ impl CozeTools {
             Some(format_type) => format_type,
             None => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(
+                    content: Some(vec![rmcp::model::ContentBlock::text(
                         "Missing format_type parameter (0 for text, 2 for image)",
                     )]),
                     is_error: Some(true),
@@ -402,7 +402,7 @@ impl CozeTools {
 
         if format_type != 0 && format_type != 2 {
             return Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text(
+                content: Some(vec![rmcp::model::ContentBlock::text(
                     "Invalid format_type, must be 0 (text) or 2 (image)",
                 )]),
                 is_error: Some(true),
@@ -465,7 +465,7 @@ impl CozeTools {
                     });
 
                     Ok(CallToolResult {
-                        content: Some(vec![rmcp::model::Content::text(content)]),
+                        content: Some(vec![rmcp::model::ContentBlock::text(content)]),
                         is_error: Some(false),
                         structured_content: Some(structured),
                     })
@@ -496,7 +496,7 @@ impl CozeTools {
                     });
 
                     Ok(CallToolResult {
-                        content: Some(vec![rmcp::model::Content::text(content)]),
+                        content: Some(vec![rmcp::model::ContentBlock::text(content)]),
                         is_error: Some(true),
                         structured_content: Some(structured),
                     })
@@ -505,7 +505,7 @@ impl CozeTools {
             Err(e) => {
                 let error_msg = format!("API 调用失败: {e}");
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(error_msg.clone())]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(error_msg.clone())]),
                     is_error: Some(true),
                     structured_content: Some(json!({
                         "success": false,
@@ -556,7 +556,7 @@ impl CozeTools {
             Ok(metadata) => metadata,
             Err(e) => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(format!(
+                    content: Some(vec![rmcp::model::ContentBlock::text(format!(
                         "Failed to read file metadata: {e}"
                     ))]),
                     is_error: Some(true),
@@ -626,7 +626,7 @@ impl CozeTools {
                     "文档上传成功: dataset_id={dataset_id}, 文件='{document_name}', size={file_size} bytes, documents_returned={infos_len}"
                 );
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(content)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(content)]),
                     is_error: Some(false),
                     structured_content: Some(json!({
                         "dataset_id": dataset_id,
@@ -643,7 +643,7 @@ impl CozeTools {
                 let serialized =
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(format!(
+                    content: Some(vec![rmcp::model::ContentBlock::text(format!(
                         "文档上传失败: {e:?}"
                     ))]),
                     is_error: Some(true),
@@ -703,7 +703,7 @@ impl CozeTools {
                     }
                 }
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(out)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(out)]),
                     is_error: Some(false),
                     structured_content: Some(json!({"total": total, "items": sc})),
                 })
@@ -712,7 +712,7 @@ impl CozeTools {
                 let serialized =
                     serde_json::to_value(&e).unwrap_or(json!({"error": e.to_string()}));
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(format!(
+                    content: Some(vec![rmcp::model::ContentBlock::text(format!(
                         "[List Conversations] 请求失败: {e}"
                     ))]),
                     is_error: Some(true),
@@ -732,7 +732,7 @@ impl CozeTools {
             Some(id) => id.to_string(),
             None => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(
+                    content: Some(vec![rmcp::model::ContentBlock::text(
                         "错误: 缺少必需的 bot_id 参数",
                     )]),
                     is_error: Some(true),
@@ -745,7 +745,7 @@ impl CozeTools {
             Some(msg) => msg.to_string(),
             None => {
                 return Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(
+                    content: Some(vec![rmcp::model::ContentBlock::text(
                         "错误: 缺少必需的 message 参数",
                     )]),
                     is_error: Some(true),
@@ -850,7 +850,7 @@ impl CozeTools {
                                             );
 
                                             return Ok(CallToolResult {
-                                                content: Some(vec![rmcp::model::Content::text(
+                                                content: Some(vec![rmcp::model::ContentBlock::text(
                                                     output,
                                                 )]),
                                                 is_error: Some(false),
@@ -876,7 +876,7 @@ impl CozeTools {
                                             );
 
                                             return Ok(CallToolResult {
-                                                content: Some(vec![rmcp::model::Content::text(
+                                                content: Some(vec![rmcp::model::ContentBlock::text(
                                                     output,
                                                 )]),
                                                 is_error: Some(true),
@@ -910,7 +910,7 @@ impl CozeTools {
                     );
 
                     Ok(CallToolResult {
-                        content: Some(vec![rmcp::model::Content::text(output)]),
+                        content: Some(vec![rmcp::model::ContentBlock::text(output)]),
                         is_error: Some(false),
                         structured_content: Some(json!({
                             "conversation_id": response.conversation_id,
@@ -930,7 +930,7 @@ impl CozeTools {
                     );
 
                     Ok(CallToolResult {
-                        content: Some(vec![rmcp::model::Content::text(output)]),
+                        content: Some(vec![rmcp::model::ContentBlock::text(output)]),
                         is_error: Some(false),
                         structured_content: Some(
                             serde_json::to_value(&response).unwrap_or_default(),
@@ -941,7 +941,7 @@ impl CozeTools {
             Err(e) => {
                 let error_msg = format!("[Chat] 聊天失败: {e}");
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(error_msg)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(error_msg)]),
                     is_error: Some(true),
                     structured_content: Some(json!({"error": e.to_string()})),
                 })
@@ -1049,7 +1049,7 @@ impl CozeTools {
                                 }
                                 crate::api::chat_models::StreamEventType::ConversationChatFailed => {
                                     return Ok(CallToolResult {
-                                        content: Some(vec![rmcp::model::Content::text(
+                                        content: Some(vec![rmcp::model::ContentBlock::text(
                                             format!("[Chat Stream] 聊天失败: {:?}", response.last_error)
                                         )]),
                                         is_error: Some(true),
@@ -1065,7 +1065,7 @@ impl CozeTools {
                         }
                         Err(e) => {
                             return Ok(CallToolResult {
-                                content: Some(vec![rmcp::model::Content::text(format!(
+                                content: Some(vec![rmcp::model::ContentBlock::text(format!(
                                     "[Chat Stream] 流式响应错误: {e}"
                                 ))]),
                                 is_error: Some(true),
@@ -1083,7 +1083,7 @@ impl CozeTools {
                 );
 
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(output)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(output)]),
                     is_error: Some(false),
                     structured_content: Some(json!({
                         "conversation_id": conversation_id,
@@ -1097,7 +1097,7 @@ impl CozeTools {
             Err(e) => {
                 let error_msg = format!("[Chat Stream] 流式聊天失败: {e}");
                 Ok(CallToolResult {
-                    content: Some(vec![rmcp::model::Content::text(error_msg)]),
+                    content: Some(vec![rmcp::model::ContentBlock::text(error_msg)]),
                     is_error: Some(true),
                     structured_content: Some(json!({"error": e.to_string()})),
                 })
