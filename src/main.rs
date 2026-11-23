@@ -1,3 +1,4 @@
+mod compat;
 mod api;
 // knowledge module removed after pruning
 mod models;
@@ -6,8 +7,8 @@ mod tools;
 use rmcp::{
     handler::server::ServerHandler,
     model::{
-        CallToolRequestParam, CallToolResult, Implementation, ListToolsResult,
-        PaginatedRequestParam, ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
+        CallToolRequestParams, CallToolResponse, Implementation, ListToolsResult,
+        PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
     },
     service::{serve_server, RequestContext, RoleServer},
     ErrorData as McpError,
@@ -52,15 +53,15 @@ impl CozeServer {
 impl ServerHandler for CozeServer {
     async fn call_tool(
         &self,
-        params: CallToolRequestParam,
+        params: CallToolRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResponse, McpError> {
         let tool_name = &params.name;
         let args_value: Option<Value> = params.arguments.as_ref().map(|m| Value::Object(m.clone()));
 
         info!("Calling tool: {}", tool_name);
 
-        let result: Result<CallToolResult, McpError> = match &tool_name[..] {
+        let result: Result<compat::CallToolResult, McpError> = match &tool_name[..] {
             "list_bots" => self.tools.list_bots(args_value.clone()).await,
             "list_knowledge_bases" => self.tools.list_knowledge_bases(args_value.clone()).await,
             "create_dataset" => self.tools.create_dataset(args_value.clone()).await,
@@ -72,8 +73,8 @@ impl ServerHandler for CozeServer {
             "list_conversations" => self.tools.list_conversations(args_value.clone()).await,
             "chat" => self.tools.chat(args_value.clone()).await,
             "chat_stream" => self.tools.chat_stream(args_value.clone()).await,
-            "ping" => Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text("pong")]),
+            "ping" => Ok(compat::CallToolResult {
+                content: Some(vec![rmcp::model::ContentBlock::text("pong")]),
                 is_error: Some(false),
                 structured_content: Some(serde_json::json!({"ok":true})),
             }),
@@ -83,20 +84,17 @@ impl ServerHandler for CozeServer {
             )),
         };
 
-        result
+        result.map(|value| CallToolResponse::Complete(value.into()))
     }
     async fn list_tools(
         &self,
-        _params: Option<PaginatedRequestParam>,
+        _params: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, McpError> {
         // 精选7个最常用的工具
         let tools = vec![
             // 1. Bot管理 - 核心功能
-            Tool {
-                name: "list_bots".into(),
-                description: Some("列出智能体列表 - 支持按发布状态、分页等条件筛选".into()),
-                input_schema: Arc::new(serde_json::json!({
+            Tool::new("list_bots", "列出智能体列表 - 支持按发布状态、分页等条件筛选", Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "workspace_id": {
@@ -122,29 +120,17 @@ impl ServerHandler for CozeServer {
                         }
                     },
                     "required": []
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
+                }).as_object().unwrap().clone())),
             // 2. 知识库管理 - 核心功能
-            Tool {
-                name: "list_knowledge_bases".into(),
-                description: Some("列出所有知识库".into()),
-                input_schema: Arc::new(serde_json::json!({
+            Tool::new("list_knowledge_bases", "列出所有知识库", Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "space_id": { "type": "string", "description": "空间ID (可选，使用默认space_id)" },
                     },
                     "required": []
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
+                }).as_object().unwrap().clone())),
             // 3. 标准知识库创建 API - 符合官方文档规范
-            Tool {
-                name: "create_dataset".into(),
-                description: Some("创建知识库（使用标准 v1/datasets API，符合官方文档规范）".into()),
-                input_schema: Arc::new(serde_json::json!({
+            Tool::new("create_dataset", "创建知识库（使用标准 v1/datasets API，符合官方文档规范）", Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "name": {
@@ -170,15 +156,9 @@ impl ServerHandler for CozeServer {
                         }
                     },
                     "required": ["name", "format_type"]
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
+                }).as_object().unwrap().clone())),
             // 4. 文档上传 - 重要功能
-            Tool {
-                name: "upload_document_to_knowledge_base".into(),
-                description: Some("上传本地文档到知识库".into()),
-                input_schema: Arc::new(serde_json::json!({
+            Tool::new("upload_document_to_knowledge_base", "上传本地文档到知识库", Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "dataset_id": { "type": "string", "description": "知识库ID" },
@@ -188,15 +168,9 @@ impl ServerHandler for CozeServer {
                         "chunk_overlap": { "type": "number", "description": "分片重叠（可选，默认100）" }
                     },
                     "required": ["dataset_id", "file_path"]
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
+                }).as_object().unwrap().clone())),
             // 5. 会话管理 - 核心功能
-            Tool {
-                name: "list_conversations".into(),
-                description: Some("列出对话".into()),
-                input_schema: Arc::new(serde_json::json!({
+            Tool::new("list_conversations", "列出对话", Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "workspace_id": { "type": "string", "description": "工作区ID (可选，使用默认space_id)" },
@@ -205,15 +179,9 @@ impl ServerHandler for CozeServer {
                         "page_size": { "type": "number", "description": "每页数量，默认20" }
                     },
                     "required": ["bot_id"]
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
+                }).as_object().unwrap().clone())),
             // 6. 聊天对话 - 重要功能
-            Tool {
-                name: "chat".into(),
-                description: Some("发送聊天消息（非流式）".into()),
-                input_schema: Arc::new(serde_json::json!({
+            Tool::new("chat", "发送聊天消息（非流式）", Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "bot_id": { "type": "string", "description": "Bot ID（必填）" },
@@ -227,15 +195,9 @@ impl ServerHandler for CozeServer {
                         }
                     },
                     "required": ["bot_id", "message"]
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
+                }).as_object().unwrap().clone())),
             // 7. 流式聊天对话 - 重要功能
-            Tool {
-                name: "chat_stream".into(),
-                description: Some("发送流式聊天消息".into()),
-                input_schema: Arc::new(serde_json::json!({
+            Tool::new("chat_stream", "发送流式聊天消息", Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
                         "bot_id": { "type": "string", "description": "Bot ID（必填）" },
@@ -249,28 +211,20 @@ impl ServerHandler for CozeServer {
                         }
                     },
                     "required": ["bot_id", "message"]
-                }).as_object().unwrap().clone()),
-                annotations: None,
-                output_schema: None,
-            },
+                }).as_object().unwrap().clone())),
         ];
         info!("list_tools invoked, returning {} tools", tools.len());
-        Ok(ListToolsResult {
-            tools,
-            next_cursor: None,
-        })
+        Ok(ListToolsResult::with_all_items(tools))
     }
 
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::LATEST,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
-            server_info: Implementation {
-                name: "coze-mcp-server".into(),
-                version: "0.2.3".into(),
-            },
+            server_info: Implementation::new("coze-mcp-server", "0.2.3"),
             // 在 instructions 中嵌入工具名称，便于客户端未调用 list_tools 时人工确认
             instructions: Some("Coze MCP Server ready.".to_string()),
+            meta: None,
         }
     }
 }

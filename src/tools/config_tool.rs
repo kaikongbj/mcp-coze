@@ -1,5 +1,5 @@
 use crate::api::CozeApiClient;
-use rmcp::model::CallToolResult;
+use crate::compat::CallToolResult;
 use rmcp::ErrorData as McpError;
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -62,14 +62,14 @@ impl ConfigTool {
 
         if api_key.trim().is_empty() {
             return Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text("API Key不能为空")]),
+                content: Some(vec![rmcp::model::ContentBlock::text("API Key不能为空")]),
                 is_error: Some(true),
                 structured_content: None,
             });
         }
         if !api_key.starts_with("pat_") && api_key.len() < 10 {
             return Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text(
+                content: Some(vec![rmcp::model::ContentBlock::text(
                     "无效的API Key格式，应该是以pat_开头的个人访问令牌",
                 )]),
                 is_error: Some(true),
@@ -78,7 +78,7 @@ impl ConfigTool {
         }
         self.set_api_key_str(api_key.to_string()).await;
         Ok(CallToolResult {
-            content: Some(vec![rmcp::model::Content::text(format!(
+            content: Some(vec![rmcp::model::ContentBlock::text(format!(
                 "API Key设置成功！\n已配置的Key: {}...",
                 &api_key[..8]
             ))]),
@@ -107,7 +107,7 @@ impl ConfigTool {
 
         if api_key.trim().is_empty() {
             return Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text("API Key不能为空")]),
+                content: Some(vec![rmcp::model::ContentBlock::text("API Key不能为空")]),
                 is_error: Some(true),
                 structured_content: None,
             });
@@ -116,7 +116,7 @@ impl ConfigTool {
         // 验证API Key格式
         if !api_key.starts_with("pat_") && api_key.len() < 10 {
             return Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text(
+                content: Some(vec![rmcp::model::ContentBlock::text(
                     "无效的API Key格式，应该是以pat_开头的个人访问令牌",
                 )]),
                 is_error: Some(true),
@@ -128,7 +128,7 @@ impl ConfigTool {
         // 同上：暂不更新底层客户端（需要内部可变性支持）
 
         Ok(CallToolResult {
-            content: Some(vec![rmcp::model::Content::text(format!(
+            content: Some(vec![rmcp::model::ContentBlock::text(format!(
                 "API Key设置成功！\n已配置的Key: {}...",
                 &api_key[..8]
             ))]),
@@ -150,7 +150,7 @@ impl ConfigTool {
         };
 
         Ok(CallToolResult {
-            content: Some(vec![rmcp::model::Content::text(format!(
+            content: Some(vec![rmcp::model::ContentBlock::text(format!(
                 "配置状态:\nAPI Key已配置: {is_configured}\nKey预览: {key_preview}"
             ))]),
             is_error: Some(false),
@@ -161,7 +161,7 @@ impl ConfigTool {
     pub async fn test_connection(&self, _args: Option<Value>) -> Result<CallToolResult, McpError> {
         if !self.is_configured().await {
             return Ok(CallToolResult {
-                content: Some(vec![rmcp::model::Content::text("请先设置API Key")]),
+                content: Some(vec![rmcp::model::ContentBlock::text("请先设置API Key")]),
                 is_error: Some(true),
                 structured_content: None,
             });
@@ -169,7 +169,7 @@ impl ConfigTool {
 
         // 这里可以添加实际的API连接测试
         Ok(CallToolResult {
-            content: Some(vec![rmcp::model::Content::text(
+            content: Some(vec![rmcp::model::ContentBlock::text(
                 "连接测试成功！Coze API连接正常",
             )]),
             is_error: Some(false),
